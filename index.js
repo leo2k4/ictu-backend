@@ -23,3 +23,5 @@ app.use('/api/documents', documentRoutes);
 
 const commentRoutes = require('./routes/comments');
 app.use('/api/documents', commentRoutes);
+
+app.use('/api/subjects', require('./routes/subjectRoutes'));
