@@ -1,11 +1,22 @@
 const mongoose = require('mongoose');
 
 const favoriteSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    document: { type: mongoose.Schema.Types.ObjectId, ref: 'Document', required: true },
-    created_at: { type: Date, default: Date.now },
-});
+    user_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
 
-favoriteSchema.index({ user: 1, document: 1 }, { unique: true }); // Tránh duplicate
+    document_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Document',
+        required: true
+    }
+
+}, { timestamps: { createdAt: 'created_at', updatedAt: false } });
+
+
+// ================= INDEX =================
+favoriteSchema.index({ user_id: 1, document_id: 1 }, { unique: true });
 
 module.exports = mongoose.model('Favorite', favoriteSchema);
