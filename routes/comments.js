@@ -4,19 +4,21 @@ const router = express.Router();
 const Comment = require('../models/Comment');
 const auth = require('../middleware/auth');
 
-// POST comment
+
+// ================= CREATE COMMENT / REPLY =================
 router.post('/:documentId/comments', auth, async (req, res) => {
     try {
-        const { content } = req.body;
+        const { content, parent_id } = req.body;
 
         if (!content?.trim()) {
-            return res.status(400).json({ error: 'Nội dung bình luận không được rỗng' });
+            return res.status(400).json({ error: 'Nội dung không được rỗng' });
         }
 
         const comment = new Comment({
-            content,
-            user: req.user.id,
-            document: req.params.documentId,
+            content: content.trim(),
+            user_id: req.user.id,
+            document_id: req.params.documentId,
+            parent_id: parent_id || null
         });
 
         await comment.save();
@@ -32,56 +34,104 @@ router.post('/:documentId/comments', auth, async (req, res) => {
 });
 
 
-// GET list comment
+// ================= GET COMMENTS (TREE BASIC) =================
 router.get('/:documentId/comments', async (req, res) => {
     try {
-        const comments = await Comment.find({
-            document: req.params.documentId
+        const { documentId } = req.params;
+
+        // lấy comment gốc
+        const parents = await Comment.find({
+            document_id: documentId,
+            parent_id: null
         })
-            .populate('user', 'name')
+            .populate('user_id', 'name')
             .sort({ created_at: -1 });
 
-        res.json(comments);
+        // lấy replies
+        const replies = await Comment.find({
+            document_id: documentId,
+            parent_id: { $ne: null }
+        }).populate('user_id', 'name');
+
+        // map reply vào parent
+        const map = {};
+        replies.forEach(r => {
+            const key = r.parent_id.toString();
+            if (!map[key]) map[key] = [];
+            map[key].push(r);
+        });
+
+        const result = parents.map(p => ({
+            ...p.toObject(),
+            replies: map[p._id] || []
+        }));
+
+        res.json(result);
 
     } catch (err) {
         res.status(500).json({ error: 'Lỗi khi lấy bình luận' });
     }
 });
 
-// PUT sửa bình luận (chỉ owner)
+
+// ================= UPDATE COMMENT =================
 router.put('/:documentId/comments/:commentId', auth, async (req, res) => {
     try {
         const comment = await Comment.findById(req.params.commentId);
-        if (!comment) return res.status(404).json({ error: 'Bình luận không tồn tại' });
 
-        if (comment.user.toString() !== req.user.id) {
-            return res.status(403).json({ error: 'Bạn không phải người tạo bình luận này' });
+        if (!comment) {
+            return res.status(404).json({ error: 'Không tồn tại' });
         }
 
-        comment.content = req.body.content?.trim();
-        if (!comment.content) return res.status(400).json({ error: 'Nội dung không được rỗng' });
+        if (comment.user_id.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Không có quyền sửa' });
+        }
 
+        const newContent = req.body.content?.trim();
+        if (!newContent) {
+            return res.status(400).json({ error: 'Nội dung không hợp lệ' });
+        }
+
+        comment.content = newContent;
         await comment.save();
 
-        res.json({ message: 'Sửa bình luận thành công', comment });
+        res.json({ message: 'Đã cập nhật', comment });
+
     } catch (err) {
         res.status(500).json({ error: 'Lỗi khi sửa bình luận' });
     }
 });
 
-// DELETE xóa bình luận (chỉ owner hoặc admin)
+
+// ================= DELETE COMMENT =================
 router.delete('/:documentId/comments/:commentId', auth, async (req, res) => {
     try {
         const comment = await Comment.findById(req.params.commentId);
-        if (!comment) return res.status(404).json({ error: 'Bình luận không tồn tại' });
 
-        if (comment.user.toString() !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Bạn không có quyền xóa bình luận này' });
+        if (!comment) {
+            return res.status(404).json({ error: 'Không tồn tại' });
         }
 
-        await comment.deleteOne();
+        if (
+            comment.user_id.toString() !== req.user.id &&
+            req.user.role !== 'admin'
+        ) {
+            return res.status(403).json({ error: 'Không có quyền xóa' });
+        }
 
-        res.json({ message: 'Xóa bình luận thành công' });
+        // kiểm tra có reply không
+        const hasReplies = await Comment.exists({ parent_id: comment._id });
+
+        if (hasReplies) {
+            // soft delete
+            comment.content = '[Đã xóa]';
+            await comment.save();
+        } else {
+            await comment.deleteOne();
+        }
+
+        res.json({ message: 'Đã xóa bình luận' });
+
     } catch (err) {
         res.status(500).json({ error: 'Lỗi khi xóa bình luận' });
     }
