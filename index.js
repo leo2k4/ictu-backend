@@ -33,6 +33,16 @@ app.use('/api/documents', commentRoutes);   // comment cũng mount vào /api/doc
 // Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
 
+app.use((err, req, res, next) => {
+    console.error("🔥 ERROR STACK:");
+    console.error(err.stack);
+
+    res.status(500).json({
+        error: err.message,
+        stack: err.stack
+    });
+});
+
 // Khởi động server - PHẢI để CUỐI CÙNG
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
