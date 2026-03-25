@@ -4,17 +4,14 @@ const User = require('../models/User');
 
 const router = express.Router();
 
-
-// ================= REGISTER =================
+// Register
 router.post('/register', async (req, res) => {
     try {
-        let { name, email, password, student_code, faculty } = req.body;
+        const { name, email, password, student_code, faculty } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
         }
-
-        email = email.toLowerCase().trim();
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -22,7 +19,7 @@ router.post('/register', async (req, res) => {
         }
 
         const user = new User({
-            name: name.trim(),
+            name,
             email,
             password_hash: password,
             student_code,
@@ -34,44 +31,37 @@ router.post('/register', async (req, res) => {
         res.status(201).json({ message: 'Đăng ký thành công' });
 
     } catch (err) {
-        if (err.code === 11000) {
-            return res.status(400).json({ error: 'Dữ liệu bị trùng (email hoặc student_code)' });
-        }
-        res.status(500).json({ error: 'Lỗi server' });
+        res.status(500).json({ error: err.message });
     }
 });
 
 
-// ================= LOGIN =================
+// Login
 router.post('/login', async (req, res) => {
     try {
-        let { email, password } = req.body;
+        const { email, password } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu' });
         }
 
-        email = email.toLowerCase().trim();
-
         const user = await User.findOne({ email }).select('+password_hash');
 
         if (!user) {
-            return res.status(401).json({ error: 'Sai email hoặc mật khẩu' });
+            return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
         }
 
         const isMatch = await user.comparePassword(password);
 
         if (!isMatch) {
-            return res.status(401).json({ error: 'Sai email hoặc mật khẩu' });
+            return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
         }
 
-        // cập nhật last_login
-        user.last_login = new Date();
-        await user.save();
-
+        // TOKEN có thêm name
         const token = jwt.sign(
             {
                 id: user._id,
+                name: user.name,
                 role: user.role
             },
             process.env.JWT_SECRET,
@@ -85,12 +75,11 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                avatar_url: user.avatar_url
             },
         });
 
     } catch (err) {
-        res.status(500).json({ error: 'Lỗi server' });
+        res.status(500).json({ error: err.message });
     }
 });
 
