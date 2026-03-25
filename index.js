@@ -31,7 +31,7 @@ const commentRoutes = require('./routes/comments');
 app.use('/api/documents', commentRoutes);   // comment cũng mount vào /api/documents
 
 // Test route
-app.get('/', (req, res) => res.send('ICTU Backend running'));
+app.get('/', (req, res) => res.send('VERSION NEW 123'));
 
 // Khởi động server - PHẢI để CUỐI CÙNG
 const PORT = process.env.PORT || 10000;
