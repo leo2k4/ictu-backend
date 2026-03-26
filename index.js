@@ -1,50 +1,46 @@
 require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
 
-// Middleware
+// === DEBUG ENVIRONMENT VARIABLES ===
+console.log('=== ENVIRONMENT DEBUG ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
+console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
+console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
+console.log('========================');
+
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB error:', err));
+    .then(() => console.log('MongoDB connected successfully'))
+    .catch(err => {
+        console.error('MongoDB connection error:', err.message);
+        process.exit(1);
+    });
 
-// ====================== ROUTES ======================
-// Phải mount routes TRƯỚC khi listen
+// Routes...
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-const documentRoutes = require('./routes/documents');
-app.use('/api/documents', documentRoutes);
+// ... các route khác
 
-const commentRoutes = require('./routes/comments');
-app.use('/api/documents', commentRoutes);   // comment cũng mount vào /api/documents
-
-// Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
 
-app.use((err, req, res, next) => {
-    console.error("🔥 ERROR STACK:");
-    console.error(err.stack);
-
-    res.status(500).json({
-        error: err.message,
-        stack: err.stack
-    });
-});
-
-// Khởi động server - PHẢI để CUỐI CÙNG
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-    console.log(`Server on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
