@@ -2,7 +2,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-    name: { type: String, required: true, trim: true },
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
 
     email: {
         type: String,
@@ -45,9 +49,8 @@ const userSchema = new mongoose.Schema({
     timestamps: { createdAt: 'created_at', updatedAt: false }
 });
 
-// ================= HASH PASSWORD - PHIÊN BẢN AN TOÀN NHẤT =================
+// Hash password trước khi save
 userSchema.pre('save', async function (next) {
-    // Chỉ hash nếu password_hash bị thay đổi hoặc là user mới
     if (!this.isModified('password_hash')) {
         return next();
     }
@@ -55,16 +58,19 @@ userSchema.pre('save', async function (next) {
     try {
         const salt = await bcrypt.genSalt(12);
         this.password_hash = await bcrypt.hash(this.password_hash, salt);
-        next();                    // Thành công → tiếp tục save
+        next();
     } catch (err) {
-        next(err);                 // Có lỗi → truyền lỗi cho Mongoose
+        next(err);
     }
 });
 
-// ================= COMPARE PASSWORD =================
+// Compare password - Phiên bản an toàn hơn
 userSchema.methods.comparePassword = async function (candidatePassword) {
+    if (!this.password_hash) {
+        console.error('Password hash is missing for user:', this._id);
+        return false;
+    }
     return bcrypt.compare(candidatePassword, this.password_hash);
 };
 
-// Index (không cần khai báo riêng nữa vì đã có trong schema)
 module.exports = mongoose.model('User', userSchema);
