@@ -2,11 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true,
-        trim: true
-    },
+    name: { type: String, required: true, trim: true },
 
     email: {
         type: String,
@@ -49,25 +45,23 @@ const userSchema = new mongoose.Schema({
     timestamps: { createdAt: 'created_at', updatedAt: false }
 });
 
-// Hash password trước khi save
-userSchema.pre('save', async function (next) {
+// ================= HASH PASSWORD - SỬA LỖI "next is not a function" =================
+userSchema.pre('save', async function () {
     if (!this.isModified('password_hash')) {
-        return next();
+        return;
     }
 
     try {
         const salt = await bcrypt.genSalt(12);
         this.password_hash = await bcrypt.hash(this.password_hash, salt);
-        next();
     } catch (err) {
-        next(err);
+        throw err;
     }
 });
 
-// Compare password - Phiên bản an toàn hơn
+// ================= COMPARE PASSWORD =================
 userSchema.methods.comparePassword = async function (candidatePassword) {
     if (!this.password_hash) {
-        console.error('Password hash is missing for user:', this._id);
         return false;
     }
     return bcrypt.compare(candidatePassword, this.password_hash);
