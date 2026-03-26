@@ -6,14 +6,16 @@ const cors = require('cors');
 
 const app = express();
 
-// === DEBUG ENVIRONMENT VARIABLES ===
+// Debug Environment Variables
 console.log('=== ENVIRONMENT DEBUG ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
 console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
+console.log('CLOUDINARY_CLOUD_NAME exists:', !!process.env.CLOUDINARY_CLOUD_NAME);
 console.log('========================');
 
+// Middleware
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -32,13 +34,34 @@ mongoose.connect(process.env.MONGO_URI)
         process.exit(1);
     });
 
-// Routes...
+// ====================== ROUTES ======================
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// ... các route khác
+// Documents routes
+const documentRoutes = require('./routes/documents');
+app.use('/api/documents', documentRoutes);
 
+// Subjects routes
+const subjectRoutes = require('./routes/subjectRoutes');
+app.use('/api/subjects', subjectRoutes);
+
+// Comments routes - Mount riêng để rõ ràng
+const commentRoutes = require('./routes/comments');
+app.use('/api/documents', commentRoutes);     // giữ nguyên cách mount cũ của bạn (/:documentId/comments)
+
+// Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('🔥 Global Error:', err.message);
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        message: err.message || 'Lỗi server'
+    });
+});
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
