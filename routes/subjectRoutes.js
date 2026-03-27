@@ -4,12 +4,24 @@ const router = express.Router();
 const Subject = require('../models/Subject');
 
 router.get('/', async (req, res) => {
-    try {
-        const subjects = await Subject.find().select('name code');
-        res.json(subjects);
-    } catch (err) {
-        res.status(500).json({ error: 'Lỗi lấy môn học' });
-    }
+    const collections = await require('mongoose')
+        .connection
+        .db
+        .listCollections()
+        .toArray();
+
+    console.log("COLLECTIONS:", collections.map(c => c.name));
+
+    const data = await require('mongoose')
+        .connection
+        .db
+        .collection('subjects')
+        .find()
+        .toArray();
+
+    console.log("RAW DATA:", data);
+
+    res.json(data);
 });
 
 module.exports = router;
