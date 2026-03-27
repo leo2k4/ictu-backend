@@ -38,6 +38,8 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'Thiếu subject_id' });
         }
 
+        const subjectObjectId = new mongoose.Types.ObjectId(subject_id);
+
         const document = new Document({
             title,
             description,
@@ -45,7 +47,7 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
             file_type: req.file.mimetype,
             file_size: req.file.size,
             user_id: req.user.id,
-            subject_id,
+            subject_id: subjectObjectId,
             tags: tags ? tags.split(',').map(t => t.trim()) : [],
         });
 
