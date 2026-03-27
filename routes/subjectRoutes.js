@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
         .listCollections()
         .toArray();
 
-    console.log("COLLECTIONS:", collections.map(c => c.name));
+    // console.log("COLLECTIONS:", collections.map(c => c.name));
 
     const data = await require('mongoose')
         .connection
@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
         .find()
         .toArray();
 
-    console.log("RAW DATA:", data);
+    // console.log("RAW DATA:", data);
 
     res.json(data);
 });
