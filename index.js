@@ -7,13 +7,13 @@ const cors = require('cors');
 const app = express();
 
 // Debug Environment Variables
-console.log('=== ENVIRONMENT DEBUG ===');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
-console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
-console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
-console.log('CLOUDINARY_CLOUD_NAME exists:', !!process.env.CLOUDINARY_CLOUD_NAME);
-console.log('========================');
+// console.log('=== ENVIRONMENT DEBUG ===');
+// console.log('NODE_ENV:', process.env.NODE_ENV);
+// console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
+// console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
+// console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
+// console.log('CLOUDINARY_CLOUD_NAME exists:', !!process.env.CLOUDINARY_CLOUD_NAME);
+// console.log('========================');
 
 // Middleware
 app.use(cors({
@@ -48,7 +48,7 @@ app.use('/api/subjects', subjectRoutes);
 
 // Comments routes - Mount riêng để rõ ràng
 const commentRoutes = require('./routes/comments');
-app.use('/api/documents', commentRoutes);     // giữ nguyên cách mount cũ của bạn (/:documentId/comments)
+app.use('/api/documents', commentRoutes);
 
 // Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
