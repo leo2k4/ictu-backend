@@ -159,4 +159,42 @@ router.get('/my-documents', auth, async (req, res) => {
     }
 });
 
+// ================= DELETE DOCUMENT (cả Cloudinary) =================
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const doc = await Document.findById(req.params.id);
+
+        if (!doc) {
+            return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+        }
+
+        // Chỉ cho phép xóa của chính user
+        if (doc.user_id.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Không có quyền xóa tài liệu này' });
+        }
+
+        // ===== Xóa file trên Cloudinary =====
+        if (doc.file_url) {
+            const urlParts = doc.file_url.split('/');
+            const fileNameWithExt = urlParts[urlParts.length - 1]; // abc123.pdf
+            const publicId = `ictu-documents/${fileNameWithExt.split('.')[0]}`;
+
+            try {
+                await cloudinary.uploader.destroy(publicId, { resource_type: 'auto' });
+            } catch (err) {
+                console.error('Lỗi xóa file Cloudinary:', err);
+                // Không dừng, vẫn xóa document trên DB
+            }
+        }
+
+        // ===== Xóa document trên DB =====
+        await doc.deleteOne();
+
+        res.json({ message: 'Xóa tài liệu thành công' });
+    } catch (err) {
+        console.error('Xóa tài liệu lỗi:', err);
+        res.status(500).json({ error: 'Xóa tài liệu thất bại' });
+    }
+});
+
 module.exports = router;
