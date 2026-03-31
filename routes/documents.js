@@ -147,4 +147,16 @@ router.get('/favorites', auth, async (req, res) => {
     }
 });
 
+router.get('/my-documents', auth, async (req, res) => {
+    try {
+        const docs = await Document.find({ user_id: req.user.id })
+            .populate('subject_id', 'name')
+            .sort({ createdAt: -1 });
+
+        res.json(docs);
+    } catch (err) {
+        res.status(500).json({ error: 'Lỗi lấy tài liệu của bạn' });
+    }
+});
+
 module.exports = router;

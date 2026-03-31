@@ -38,6 +38,9 @@ mongoose.connect(process.env.MONGO_URI)
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
+const userRoutes = require('./routes/users');
+app.use('/api/users', userRoutes);
+
 // Documents routes
 const documentRoutes = require('./routes/documents');
 app.use('/api/documents', documentRoutes);
@@ -48,7 +51,7 @@ app.use('/api/subjects', subjectRoutes);
 
 // Comments routes - Mount riêng để rõ ràng
 const commentRoutes = require('./routes/comments');
-app.use('/api/documents', commentRoutes);
+app.use('/api/comments', commentRoutes);
 
 // Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
@@ -62,6 +65,8 @@ app.use((err, req, res, next) => {
         message: err.message || 'Lỗi server'
     });
 });
+
+app.use('/uploads', express.static('uploads'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
