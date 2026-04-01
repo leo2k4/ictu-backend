@@ -159,7 +159,7 @@ router.get('/my-documents', auth, async (req, res) => {
     }
 });
 
-// ================= DELETE DOCUMENT (cả Cloudinary) =================
+// ================= DELETE DOCUMENT =================
 router.delete('/:id', auth, async (req, res) => {
     try {
         const doc = await Document.findById(req.params.id);
@@ -173,24 +173,25 @@ router.delete('/:id', auth, async (req, res) => {
             return res.status(403).json({ error: 'Không có quyền xóa tài liệu này' });
         }
 
+        // ===== XÓA TẤT CẢ FAVORITES liên quan đến document này =====
+        await Favorite.deleteMany({ document_id: req.params.id });
+
         // ===== Xóa file trên Cloudinary =====
         if (doc.file_url) {
-            const urlParts = doc.file_url.split('/');
-            const fileNameWithExt = urlParts[urlParts.length - 1]; // abc123.pdf
-            const publicId = `ictu-documents/${fileNameWithExt.split('.')[0]}`;
-
             try {
+                const urlParts = doc.file_url.split('/');
+                const publicId = `ictu-documents/${urlParts[urlParts.length - 1].split('.')[0]}`;
                 await cloudinary.uploader.destroy(publicId, { resource_type: 'auto' });
             } catch (err) {
                 console.error('Lỗi xóa file Cloudinary:', err);
-                // Không dừng, vẫn xóa document trên DB
             }
         }
 
         // ===== Xóa document trên DB =====
         await doc.deleteOne();
 
-        res.json({ message: 'Xóa tài liệu thành công' });
+        res.json({ message: 'Xóa tài liệu thành công và đã xóa khỏi yêu thích của mọi người' });
+
     } catch (err) {
         console.error('Xóa tài liệu lỗi:', err);
         res.status(500).json({ error: 'Xóa tài liệu thất bại' });
