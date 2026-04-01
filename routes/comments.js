@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
+const Notification = require('../models/Notifications');
+const Document = require('../models/Document');
+
 const Comment = require('../models/Comment');
 const auth = require('../middleware/auth');
 
@@ -22,6 +25,19 @@ router.post('/:documentId/comments', auth, async (req, res) => {
         });
 
         await comment.save();
+
+        // ====== TẠO NOTIFICATION ======
+        const document = await Document.findById(req.params.documentId);
+
+        if (document && document.user_id.toString() !== req.user.id) {
+            await Notification.create({
+                user_id: document.user_id,     // người nhận
+                sender_id: req.user.id,        // người comment
+                type: "COMMENT",
+                document_id: document._id,
+                comment_id: comment._id
+            });
+        }
 
         res.status(201).json({
             message: 'Bình luận thành công',
