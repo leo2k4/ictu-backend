@@ -3,12 +3,12 @@ const mongoose = require("mongoose");
 const notificationSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Users",
+        ref: "User",
         required: true
     },
     sender_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Users"
+        ref: "User"
     },
     type: {
         type: String,
@@ -17,11 +17,11 @@ const notificationSchema = new mongoose.Schema({
     },
     document_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Documents"
+        ref: "Document"
     },
     comment_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Comments"
+        ref: "Comment"
     },
     is_read: {
         type: Boolean,

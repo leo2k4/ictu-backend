@@ -29,14 +29,20 @@ router.post('/:documentId/comments', auth, async (req, res) => {
         // ====== TẠO NOTIFICATION ======
         const document = await Document.findById(req.params.documentId);
 
-        if (document && document.user_id.toString() !== req.user.id) {
-            await Notification.create({
-                user_id: document.user_id,     // người nhận
-                sender_id: req.user.id,        // người comment
-                type: "COMMENT",
-                document_id: document._id,
-                comment_id: comment._id
-            });
+        try {
+            const document = await Document.findById(req.params.documentId);
+
+            if (document && document.user_id.toString() !== req.user.id) {
+                await Notification.create({
+                    user_id: document.user_id,
+                    sender_id: req.user.id,
+                    type: "COMMENT",
+                    document_id: document._id,
+                    comment_id: comment._id
+                });
+            }
+        } catch (err) {
+            console.error("Notification error:", err.message);
         }
 
         res.status(201).json({
