@@ -95,7 +95,23 @@ router.post('/:documentId/favorite', auth, async (req, res) => {
             return res.json({ message: 'Đã bỏ yêu thích', isFavorite: false });
         }
 
+        // Tạo favorite mới
         await Favorite.create(filter);
+
+        // Lấy document để biết owner
+        const doc = await Document.findById(req.params.documentId);
+        if (doc) {
+            // Tạo notification chỉ khi người tim không phải owner
+            if (doc.user_id.toString() !== req.user.id) {
+                await Notification.create({
+                    user_id: doc.user_id,
+                    sender_id: req.user.id,
+                    type: "LIKE",
+                    document_id: doc._id,
+                    is_read: false,
+                });
+            }
+        }
 
         res.json({ message: 'Đã thêm vào yêu thích', isFavorite: true });
 
