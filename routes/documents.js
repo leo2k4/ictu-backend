@@ -7,6 +7,7 @@ const auth = require('../middleware/auth');
 const Document = require('../models/Document');
 const Favorite = require('../models/Favorite');
 const Notification = require('../models/Notifications');
+
 const router = express.Router();
 
 // ================= CLOUDINARY =================
@@ -65,7 +66,6 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
     }
 });
 
-
 // ================= LIST DOCUMENT =================
 router.get('/', async (req, res) => {
     try {
@@ -79,7 +79,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-
 // ================= TOGGLE FAVORITE =================
 router.post('/:documentId/favorite', auth, async (req, res) => {
     try {
@@ -90,19 +89,35 @@ router.post('/:documentId/favorite', auth, async (req, res) => {
 
         const existing = await Favorite.findOne(filter);
 
+        const doc = await Document.findById(req.params.documentId);
+        if (!doc) return res.status(404).json({ error: 'Tài liệu không tồn tại' });
+
         if (existing) {
+            // Unfavorite → xóa favorite và notification liên quan
             await Favorite.deleteOne({ _id: existing._id });
+            await Notification.deleteMany({
+                user_id: doc.user_id,
+                sender_id: req.user.id,
+                document_id: doc._id,
+                type: "LIKE"
+            });
+
             return res.json({ message: 'Đã bỏ yêu thích', isFavorite: false });
         }
 
         // Tạo favorite mới
         await Favorite.create(filter);
 
-        // Lấy document để biết owner
-        const doc = await Document.findById(req.params.documentId);
-        if (doc) {
-            // Tạo notification chỉ khi người tim không phải owner
-            if (doc.user_id.toString() !== req.user.id) {
+        // Tạo notification nếu chưa có và user không phải owner
+        if (doc.user_id.toString() !== req.user.id) {
+            const existingNotif = await Notification.findOne({
+                user_id: doc.user_id,
+                sender_id: req.user.id,
+                document_id: doc._id,
+                type: "LIKE"
+            });
+
+            if (!existingNotif) {
                 await Notification.create({
                     user_id: doc.user_id,
                     sender_id: req.user.id,
@@ -116,13 +131,13 @@ router.post('/:documentId/favorite', auth, async (req, res) => {
         res.json({ message: 'Đã thêm vào yêu thích', isFavorite: true });
 
     } catch (err) {
+        console.error(err);
         if (err.code === 11000) {
             return res.status(400).json({ message: 'Đã tồn tại trong favorites' });
         }
         res.status(500).json({ error: 'Lỗi khi cập nhật yêu thích' });
     }
 });
-
 
 // ================= CHECK FAVORITE =================
 router.get('/:documentId/favorite/status', auth, async (req, res) => {
@@ -139,7 +154,6 @@ router.get('/:documentId/favorite/status', auth, async (req, res) => {
     }
 });
 
-
 // ================= LIST FAVORITES =================
 router.get('/favorites', auth, async (req, res) => {
     try {
@@ -154,7 +168,6 @@ router.get('/favorites', auth, async (req, res) => {
             })
             .sort({ created_at: -1 });
 
-        // trả về list document
         res.json(favorites.map(f => f.document_id));
 
     } catch (err) {
@@ -163,6 +176,7 @@ router.get('/favorites', auth, async (req, res) => {
     }
 });
 
+// ================= MY DOCUMENTS =================
 router.get('/my-documents', auth, async (req, res) => {
     try {
         const docs = await Document.find({ user_id: req.user.id })
@@ -179,20 +193,19 @@ router.get('/my-documents', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
     try {
         const doc = await Document.findById(req.params.id);
+        if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
 
-        if (!doc) {
-            return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
-        }
-
-        // Chỉ cho phép xóa của chính user
         if (doc.user_id.toString() !== req.user.id) {
             return res.status(403).json({ error: 'Không có quyền xóa tài liệu này' });
         }
 
-        // ===== XÓA TẤT CẢ FAVORITES liên quan đến document này =====
+        // Xóa tất cả favorites liên quan
         await Favorite.deleteMany({ document_id: req.params.id });
 
-        // ===== Xóa file trên Cloudinary =====
+        // Xóa tất cả notifications liên quan
+        await Notification.deleteMany({ document_id: req.params.id });
+
+        // Xóa file trên Cloudinary
         if (doc.file_url) {
             try {
                 const urlParts = doc.file_url.split('/');
@@ -203,10 +216,9 @@ router.delete('/:id', auth, async (req, res) => {
             }
         }
 
-        // ===== Xóa document trên DB =====
         await doc.deleteOne();
 
-        res.json({ message: 'Xóa tài liệu thành công và đã xóa khỏi yêu thích của mọi người' });
+        res.json({ message: 'Xóa tài liệu thành công' });
 
     } catch (err) {
         console.error('Xóa tài liệu lỗi:', err);
