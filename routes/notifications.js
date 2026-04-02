@@ -4,7 +4,7 @@ const auth = require('../middleware/auth');
 const Notification = require('../models/Notifications');
 
 // GET /api/notifications
-router.get('/notifications', auth, async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const notifications = await Notification.find({ user_id: req.user.id })
             .populate('sender_id', 'name')
@@ -19,7 +19,7 @@ router.get('/notifications', auth, async (req, res) => {
 });
 
 // PATCH /api/notifications/:id/read
-router.patch('/notifications/:id/read', auth, async (req, res) => {
+router.patch('/:id/read', auth, async (req, res) => {
     try {
         const notification = await Notification.findById(req.params.id);
         if (!notification) return res.status(404).json({ error: 'Không tìm thấy thông báo' });
