@@ -6,7 +6,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const auth = require('../middleware/auth');
 const Document = require('../models/Document');
 const Favorite = require('../models/Favorite');
-
+const Notification = require('../models/Notifications');
 const router = express.Router();
 
 // ================= CLOUDINARY =================
