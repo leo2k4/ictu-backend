@@ -53,6 +53,10 @@ app.use('/api/subjects', subjectRoutes);
 const commentRoutes = require('./routes/comments');
 app.use('/api/comments', commentRoutes);
 
+const notificationsRouter = require('./routes/notifications');
+
+app.use('/api/notifications', notificationsRouter);
+
 // Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
 

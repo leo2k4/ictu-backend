@@ -51,7 +51,8 @@ router.post('/:documentId/comments', auth, async (req, res) => {
         });
 
     } catch (err) {
-        res.status(500).json({ error: 'Lỗi khi thêm bình luận' });
+        console.error("FULL ERROR:", err);
+        res.status(500).json({ error: err.message });
     }
 });
 
