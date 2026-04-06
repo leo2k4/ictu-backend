@@ -31,7 +31,6 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB connected successfully'))
     .catch(err => {
         console.error('MongoDB connection error:', err.message);
-        process.exit(1);
     });
 
 // ====================== ROUTES ======================
@@ -60,6 +59,7 @@ app.use('/api/notifications', notificationsRouter);
 // Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
 
+app.use('/api/dashboard', require('./routes/dashboard'));
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error('🔥 Global Error:', err.message);
