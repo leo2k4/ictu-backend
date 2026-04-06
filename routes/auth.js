@@ -84,14 +84,5 @@ router.post('/login', async (req, res) => {
     }
 });
 
-router.get('/me', auth, async (req, res) => {
-    try {
-        const user = await User.findById(req.user.id).select('-password_hash');
-        if (!user) return res.status(404).json({ error: 'Không tìm thấy user' });
-        res.json(user);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 module.exports = router;
