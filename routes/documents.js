@@ -226,4 +226,30 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
+// Route: POST /api/documents/:id/download
+router.post('/:id/download', async (req, res) => {
+    try {
+        const documentId = req.params.id;
+
+        // Tìm tài liệu theo ID và tăng download_count lên 1
+        const updatedDoc = await Document.findByIdAndUpdate(
+            documentId,
+            { $inc: { download_count: 1 } }, // $inc là toán tử tăng giá trị trong MongoDB
+            { new: true } // Trả về dữ liệu sau khi đã cập nhật
+        );
+
+        if (!updatedDoc) {
+            return res.status(404).json({ error: "Không tìm thấy tài liệu" });
+        }
+
+        res.status(200).json({
+            message: "Cập nhật lượt tải thành công",
+            download_count: updatedDoc.download_count
+        });
+    } catch (error) {
+        console.error("Lỗi cập nhật download_count:", error);
+        res.status(500).json({ error: "Lỗi hệ thống" });
+    }
+});
+
 module.exports = router;
