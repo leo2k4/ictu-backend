@@ -160,7 +160,6 @@ router.get('/favorites', auth, async (req, res) => {
         const favorites = await Favorite.find({ user_id: req.user.id })
             .populate({
                 path: 'document_id',
-                select: 'title description file_url download_count upload_date user_id',
                 populate: {
                     path: 'user_id',
                     select: 'name'
