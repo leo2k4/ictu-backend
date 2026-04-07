@@ -251,4 +251,22 @@ router.post('/:id/download', async (req, res) => {
     }
 });
 
+// Lấy chi tiết 1 tài liệu theo ID
+router.get('/:id', async (req, res) => {
+    try {
+        const doc = await Document.findById(req.params.id)
+            .populate('user_id', 'name email')
+            .populate('subject_id', 'name code');
+
+        if (!doc) {
+            return res.status(404).json({ error: 'Tài liệu không tồn tại' });
+        }
+
+        res.json(doc);
+    } catch (err) {
+        console.error('Lấy chi tiết tài liệu lỗi:', err);
+        res.status(500).json({ error: 'Lỗi hệ thống' });
+    }
+});
+
 module.exports = router;
