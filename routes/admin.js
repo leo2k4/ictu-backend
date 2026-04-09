@@ -68,14 +68,45 @@ router.patch('/documents/:id/reject', verifyToken, isAdmin, async (req, res) => 
     }
 });
 
-// GET /admin/documents
+// GET /admin/documents (ALL + FILTER + SEARCH)
 router.get('/documents', verifyToken, isAdmin, async (req, res) => {
     try {
-        const docs = await Document.find()
+        const { status, keyword } = req.query;
+
+        let query = {};
+
+        // FILTER theo status
+        if (status && status !== 'all') {
+            query.status = status;
+        }
+
+        // SEARCH theo title
+        if (keyword) {
+            query.title = { $regex: keyword, $options: 'i' };
+        }
+
+        const docs = await Document.find(query)
             .populate('user_id', 'name email')
             .populate('subject_id', 'name')
             .sort({ upload_date: -1 });
+
         res.json(docs);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /admin/documents/:id
+router.delete('/documents/:id', verifyToken, isAdmin, async (req, res) => {
+    try {
+        const doc = await Document.findByIdAndDelete(req.params.id);
+
+        if (!doc) {
+            return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+        }
+
+        res.json({ message: 'Đã xóa tài liệu' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
