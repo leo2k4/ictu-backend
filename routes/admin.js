@@ -114,8 +114,31 @@ router.delete('/documents/:id', verifyToken, isAdmin, async (req, res) => {
 
 // GET /admin/users
 router.get('/users', verifyToken, isAdmin, async (req, res) => {
-    const users = await User.find().select('-password_hash').sort({ createdAt: -1 });
-    res.json(users);
+    try {
+        const { keyword, role } = req.query;
+
+        let query = {};
+
+        if (role && role !== 'all') {
+            query.role = role;
+        }
+
+        if (keyword) {
+            query.$or = [
+                { name: { $regex: keyword, $options: 'i' } },
+                { email: { $regex: keyword, $options: 'i' } }
+            ];
+        }
+
+        const users = await User.find(query)
+            .select('-password_hash')
+            .sort({ created_at: -1 });
+
+        res.json(users);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 ////////////////////////////////////////////////////
