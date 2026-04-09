@@ -73,25 +73,6 @@ router.patch('/avatar', auth, upload.single('avatar'), async (req, res) => {
     }
 });
 
-// ================== USER STATS (Giữ nguyên của bạn - Rất tốt) ==================
-router.get('/stats', auth, async (req, res) => {
-    try {
-        const uploaded = await Document.countDocuments({ user_id: req.user.id });
-        const downloadsAgg = await Document.aggregate([
-            { $match: { user_id: req.user.id } },
-            { $group: { _id: null, total: { $sum: "$download_count" } } }
-        ]);
-        const favorites = await Favorite.countDocuments({ user_id: req.user.id });
-
-        res.json({
-            uploaded,
-            downloads: downloadsAgg[0]?.total || 0,
-            favorites
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // ================== USER STATS ==================
 // GET /api/users/stats

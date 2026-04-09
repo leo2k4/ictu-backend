@@ -60,6 +60,10 @@ app.use('/api/notifications', notificationsRouter);
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
 
 app.use('/api/dashboard', require('./routes/dashboard'));
+
+const adminRoutes = require('./routes/admin');
+
+app.use('/admin', adminRoutes);
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error('🔥 Global Error:', err.message);

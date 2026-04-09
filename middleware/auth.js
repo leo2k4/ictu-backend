@@ -1,10 +1,10 @@
 const jwt = require('jsonwebtoken');
 
-module.exports = (req, res, next) => {
+const verifyToken = (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-        return res.status(401).json({ error: 'Không có token, truy cập bị từ chối' });
+        return res.status(401).json({ error: 'Không có token' });
     }
 
     try {
@@ -12,6 +12,28 @@ module.exports = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (err) {
-        res.status(401).json({ error: 'Token không hợp lệ' });
+        return res.status(401).json({ error: 'Token không hợp lệ' });
     }
 };
+
+const authorizeRoles = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Chưa xác thực' });
+        }
+
+        if (!roles.includes(req.user.role)) {
+            return res.status(403).json({ error: 'Không có quyền' });
+        }
+
+        next();
+    };
+};
+
+const isAdmin = authorizeRoles('admin');
+
+// ✅ FIX QUAN TRỌNG (giữ tương thích code cũ)
+module.exports = verifyToken;
+module.exports.verifyToken = verifyToken;
+module.exports.authorizeRoles = authorizeRoles;
+module.exports.isAdmin = isAdmin;
