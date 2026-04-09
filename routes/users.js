@@ -9,18 +9,18 @@ const User = require('../models/User');
 const Document = require('../models/Document');
 const Favorite = require('../models/Favorite');
 
-// ================== CLOUDINARY CONFIG (Đồng bộ với documents.js) ==================
+//CLOUDINARY CONFIG 
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
-        folder: 'ictu-avatars', // Thư mục riêng cho ảnh đại diện
+        folder: 'ictu-avatars',
         allowed_formats: ['jpg', 'png', 'jpeg'],
-        transformation: [{ width: 200, height: 200, crop: 'fill' }] // Tự động crop ảnh vuông
+        transformation: [{ width: 200, height: 200, crop: 'fill' }]
     },
 });
 const upload = multer({ storage });
 
-// ================== GET ME (Lấy thông tin chính mình) ==================
+
 // GET /api/users/me
 router.get('/me', auth, async (req, res) => {
     try {
@@ -32,7 +32,7 @@ router.get('/me', auth, async (req, res) => {
     }
 });
 
-// ================== UPDATE PROFILE (Cập nhật thông tin) ==================
+
 // PATCH /api/users/update
 router.patch('/update', auth, async (req, res) => {
     try {
@@ -49,7 +49,7 @@ router.patch('/update', auth, async (req, res) => {
     }
 });
 
-// ================== UPDATE AVATAR (Lưu lên Cloudinary) ==================
+
 // PATCH /api/users/avatar
 router.patch('/avatar', auth, upload.single('avatar'), async (req, res) => {
     try {
@@ -57,7 +57,6 @@ router.patch('/avatar', auth, upload.single('avatar'), async (req, res) => {
             return res.status(400).json({ error: 'Chưa chọn ảnh' });
         }
 
-        // Với Cloudinary, path chính là URL trực tiếp của ảnh
         const avatar_url = req.file.path;
 
         const user = await User.findByIdAndUpdate(
@@ -74,7 +73,6 @@ router.patch('/avatar', auth, upload.single('avatar'), async (req, res) => {
 });
 
 
-// ================== USER STATS ==================
 // GET /api/users/stats
 router.get('/stats', auth, async (req, res) => {
     try {
@@ -108,7 +106,6 @@ router.get('/stats', auth, async (req, res) => {
 });
 
 
-// ================== USER DOCUMENTS ==================
 // GET /api/users/documents
 router.get('/documents', auth, async (req, res) => {
     try {
@@ -123,7 +120,6 @@ router.get('/documents', auth, async (req, res) => {
 });
 
 
-// ================== USER FAVORITES ==================
 // GET /api/users/favorites
 router.get('/favorites', auth, async (req, res) => {
     try {

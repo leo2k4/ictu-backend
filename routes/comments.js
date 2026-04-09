@@ -8,7 +8,7 @@ const Comment = require('../models/Comment');
 const auth = require('../middleware/auth');
 
 
-// ================= CREATE COMMENT / REPLY =================
+//CREATE COMMENT / REPLY 
 router.post('/:documentId/comments', auth, async (req, res) => {
     try {
         const { content, parent_id } = req.body;
@@ -26,7 +26,6 @@ router.post('/:documentId/comments', auth, async (req, res) => {
 
         await comment.save();
 
-        // ====== TẠO NOTIFICATION ======
         const document = await Document.findById(req.params.documentId);
 
         try {
@@ -57,12 +56,11 @@ router.post('/:documentId/comments', auth, async (req, res) => {
 });
 
 
-// ================= GET COMMENTS (TREE BASIC) =================
+//GET COMMENTS 
 router.get('/:documentId/comments', async (req, res) => {
     try {
         const { documentId } = req.params;
 
-        // lấy comment gốc
         const parents = await Comment.find({
             document_id: documentId,
             parent_id: null
@@ -70,13 +68,11 @@ router.get('/:documentId/comments', async (req, res) => {
             .populate('user_id', 'name')
             .sort({ created_at: -1 });
 
-        // lấy replies
         const replies = await Comment.find({
             document_id: documentId,
             parent_id: { $ne: null }
         }).populate('user_id', 'name');
 
-        // map reply vào parent
         const map = {};
         replies.forEach(r => {
             const key = r.parent_id.toString();
@@ -97,7 +93,7 @@ router.get('/:documentId/comments', async (req, res) => {
 });
 
 
-// ================= UPDATE COMMENT =================
+//UPDATE COMMENT 
 router.put('/:documentId/comments/:commentId', auth, async (req, res) => {
     try {
         const comment = await Comment.findById(req.params.commentId);
@@ -126,7 +122,7 @@ router.put('/:documentId/comments/:commentId', auth, async (req, res) => {
 });
 
 
-// ================= DELETE COMMENT =================
+//DELETE COMMENT 
 router.delete('/:documentId/comments/:commentId', auth, async (req, res) => {
     try {
         const comment = await Comment.findById(req.params.commentId);
@@ -142,11 +138,9 @@ router.delete('/:documentId/comments/:commentId', auth, async (req, res) => {
             return res.status(403).json({ error: 'Không có quyền xóa' });
         }
 
-        // kiểm tra có reply không
         const hasReplies = await Comment.exists({ parent_id: comment._id });
 
         if (hasReplies) {
-            // soft delete
             comment.content = '[Đã xóa]';
             await comment.save();
         } else {

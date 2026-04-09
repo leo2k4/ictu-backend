@@ -10,7 +10,7 @@ const Notification = require('../models/Notifications');
 
 const router = express.Router();
 
-// ================= CLOUDINARY =================
+//CLOUDINARY
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -27,7 +27,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-// ================= UPLOAD =================
+//UPLOAD
 router.post('/upload', auth, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -66,7 +66,7 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
     }
 });
 
-// ================= LIST DOCUMENT =================
+//LIST DOCUMENT
 router.get('/', async (req, res) => {
     try {
         const documents = await Document.find({ status: 'approved' })
@@ -79,7 +79,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// ================= TOGGLE FAVORITE =================
+//TOGGLE FAVORITE
 router.post('/:documentId/favorite', auth, async (req, res) => {
     try {
         const filter = {
@@ -93,7 +93,6 @@ router.post('/:documentId/favorite', auth, async (req, res) => {
         if (!doc) return res.status(404).json({ error: 'Tài liệu không tồn tại' });
 
         if (existing) {
-            // Unfavorite → xóa favorite và notification liên quan
             await Favorite.deleteOne({ _id: existing._id });
             await Notification.deleteMany({
                 user_id: doc.user_id,
@@ -105,10 +104,8 @@ router.post('/:documentId/favorite', auth, async (req, res) => {
             return res.json({ message: 'Đã bỏ yêu thích', isFavorite: false });
         }
 
-        // Tạo favorite mới
         await Favorite.create(filter);
 
-        // Tạo notification nếu chưa có và user không phải owner
         if (doc.user_id.toString() !== req.user.id) {
             const existingNotif = await Notification.findOne({
                 user_id: doc.user_id,
@@ -139,7 +136,7 @@ router.post('/:documentId/favorite', auth, async (req, res) => {
     }
 });
 
-// ================= CHECK FAVORITE =================
+//CHECK FAVORITE
 router.get('/:documentId/favorite/status', auth, async (req, res) => {
     try {
         const favorite = await Favorite.findOne({
@@ -154,7 +151,7 @@ router.get('/:documentId/favorite/status', auth, async (req, res) => {
     }
 });
 
-// ================= LIST FAVORITES =================
+//LIST FAVORITES 
 router.get('/favorites', auth, async (req, res) => {
     try {
         const favorites = await Favorite.find({ user_id: req.user.id })
@@ -175,7 +172,7 @@ router.get('/favorites', auth, async (req, res) => {
     }
 });
 
-// ================= MY DOCUMENTS =================
+//MY DOCUMENTS
 router.get('/my-documents', auth, async (req, res) => {
     try {
         const docs = await Document.find({ user_id: req.user.id })
@@ -188,7 +185,7 @@ router.get('/my-documents', auth, async (req, res) => {
     }
 });
 
-// ================= DELETE DOCUMENT =================
+//DELETE DOCUMENT 
 router.delete('/:id', auth, async (req, res) => {
     try {
         const doc = await Document.findById(req.params.id);
@@ -198,13 +195,10 @@ router.delete('/:id', auth, async (req, res) => {
             return res.status(403).json({ error: 'Không có quyền xóa tài liệu này' });
         }
 
-        // Xóa tất cả favorites liên quan
         await Favorite.deleteMany({ document_id: req.params.id });
 
-        // Xóa tất cả notifications liên quan
         await Notification.deleteMany({ document_id: req.params.id });
 
-        // Xóa file trên Cloudinary
         if (doc.file_url) {
             try {
                 const urlParts = doc.file_url.split('/');
@@ -230,11 +224,10 @@ router.post('/:id/download', async (req, res) => {
     try {
         const documentId = req.params.id;
 
-        // Tìm tài liệu theo ID và tăng download_count lên 1
         const updatedDoc = await Document.findByIdAndUpdate(
             documentId,
-            { $inc: { download_count: 1 } }, // $inc là toán tử tăng giá trị trong MongoDB
-            { new: true } // Trả về dữ liệu sau khi đã cập nhật
+            { $inc: { download_count: 1 } },
+            { new: true }
         );
 
         if (!updatedDoc) {

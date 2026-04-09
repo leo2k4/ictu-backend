@@ -33,7 +33,7 @@ mongoose.connect(process.env.MONGO_URI)
         console.error('MongoDB connection error:', err.message);
     });
 
-// ====================== ROUTES ======================
+//ROUTES
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
@@ -48,7 +48,7 @@ app.use('/api/documents', documentRoutes);
 const subjectRoutes = require('./routes/subjectRoutes');
 app.use('/api/subjects', subjectRoutes);
 
-// Comments routes - Mount riêng để rõ ràng
+// Comments routes 
 const commentRoutes = require('./routes/comments');
 app.use('/api/comments', commentRoutes);
 
@@ -78,5 +78,5 @@ app.use('/uploads', express.static('uploads'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });

@@ -7,16 +7,8 @@ const User = require('../models/User');
 const Document = require('../models/Document');
 const Comment = require('../models/Comment');
 
-// console.log('AUTH:', auth);
-// console.log('verifyToken:', typeof auth.verifyToken);
-// console.log('isAdmin:', typeof auth.isAdmin);
-
 const { verifyToken, isAdmin } = auth;
 
-// test trước
-// router.get('/test', verifyToken, isAdmin, (req, res) => {
-//     res.json({ message: 'Admin OK' });
-// });
 
 router.get('/stats', verifyToken, isAdmin, async (req, res) => {
     try {
@@ -68,19 +60,18 @@ router.patch('/documents/:id/reject', verifyToken, isAdmin, async (req, res) => 
     }
 });
 
-// GET /admin/documents (ALL + FILTER + SEARCH)
+// GET /admin/documents 
 router.get('/documents', verifyToken, isAdmin, async (req, res) => {
     try {
         const { status, keyword } = req.query;
 
         let query = {};
 
-        // FILTER theo status
+
         if (status && status !== 'all') {
             query.status = status;
         }
 
-        // SEARCH theo title
         if (keyword) {
             query.title = { $regex: keyword, $options: 'i' };
         }
@@ -141,8 +132,8 @@ router.get('/users', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-////////////////////////////////////////////////////
-// PATCH /admin/users/:id/role  -> đổi role user
+
+// PATCH /admin/users/:id/role  
 router.patch('/users/:id/role', verifyToken, isAdmin, async (req, res) => {
     try {
         const { role } = req.body;
@@ -164,8 +155,8 @@ router.patch('/users/:id/role', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-////////////////////////////////////////////////////
-// PATCH /admin/users/:id/block -> khóa/mở khóa user
+
+// PATCH /admin/users/:id/block 
 router.patch('/users/:id/block', verifyToken, isAdmin, async (req, res) => {
     try {
         const { blocked } = req.body;

@@ -52,13 +52,19 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
         }
 
+        // 🔥 CHẶN USER BỊ BLOCK
+        if (user.blocked) {
+            return res.status(403).json({
+                error: 'Tài khoản đã bị khóa'
+            });
+        }
+
         const isMatch = await user.comparePassword(password);
 
         if (!isMatch) {
             return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
         }
 
-        // TOKEN có thêm name
         const token = jwt.sign(
             {
                 id: user._id,
