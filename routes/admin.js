@@ -68,6 +68,19 @@ router.patch('/documents/:id/reject', verifyToken, isAdmin, async (req, res) => 
     }
 });
 
+// GET /admin/documents
+router.get('/documents', verifyToken, isAdmin, async (req, res) => {
+    try {
+        const docs = await Document.find()
+            .populate('user_id', 'name email')
+            .populate('subject_id', 'name')
+            .sort({ upload_date: -1 });
+        res.json(docs);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /admin/users
 router.get('/users', verifyToken, isAdmin, async (req, res) => {
     const users = await User.find().select('-password_hash').sort({ createdAt: -1 });
