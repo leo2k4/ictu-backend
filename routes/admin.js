@@ -118,6 +118,52 @@ router.get('/users', verifyToken, isAdmin, async (req, res) => {
     res.json(users);
 });
 
+////////////////////////////////////////////////////
+// PATCH /admin/users/:id/role  -> đổi role user
+router.patch('/users/:id/role', verifyToken, isAdmin, async (req, res) => {
+    try {
+        const { role } = req.body;
+        if (!['student', 'teacher', 'admin'].includes(role)) {
+            return res.status(400).json({ error: 'Role không hợp lệ' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.params.id,
+            { role },
+            { new: true, select: '-password_hash' }
+        );
+
+        if (!user) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+////////////////////////////////////////////////////
+// PATCH /admin/users/:id/block -> khóa/mở khóa user
+router.patch('/users/:id/block', verifyToken, isAdmin, async (req, res) => {
+    try {
+        const { blocked } = req.body;
+        if (typeof blocked !== 'boolean') {
+            return res.status(400).json({ error: 'Giá trị blocked phải là boolean' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.params.id,
+            { blocked },
+            { new: true, select: '-password_hash' }
+        );
+
+        if (!user) return res.status(404).json({ error: 'Không tìm thấy user' });
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /admin/comments
 router.get('/comments', verifyToken, isAdmin, async (req, res) => {
     const comments = await Comment.find()
