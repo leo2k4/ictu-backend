@@ -65,13 +65,13 @@ router.get('/:documentId/comments', async (req, res) => {
             document_id: documentId,
             parent_id: null
         })
-            .populate('user_id', 'name')
+            .populate('user_id', 'name email')
             .sort({ created_at: -1 });
 
         const replies = await Comment.find({
             document_id: documentId,
             parent_id: { $ne: null }
-        }).populate('user_id', 'name');
+        }).populate('user_id', 'name email');
 
         const map = {};
         replies.forEach(r => {
