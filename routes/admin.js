@@ -181,7 +181,7 @@ router.patch('/users/:id/block', verifyToken, isAdmin, async (req, res) => {
 // GET /admin/comments
 router.get('/comments', verifyToken, isAdmin, async (req, res) => {
     const comments = await Comment.find()
-        .populate('user_id', 'name')
+        .populate('user_id', 'name email')
         .populate('document_id', 'title')
         .sort({ createdAt: -1 });
     res.json(comments);
