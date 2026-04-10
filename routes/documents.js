@@ -245,7 +245,7 @@ router.post('/:id/download', async (req, res) => {
 });
 
 // Lấy chi tiết 1 tài liệu theo ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
     try {
         const doc = await Document.findById(req.params.id)
             .populate('user_id', 'name email')
@@ -255,7 +255,15 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Tài liệu không tồn tại' });
         }
 
+        // ✅ CHẶN USER THƯỜNG
+        if (doc.status !== 'approved' && req.user.role !== 'admin') {
+            return res.status(403).json({
+                error: 'Tài liệu chưa được duyệt'
+            });
+        }
+
         res.json(doc);
+
     } catch (err) {
         console.error('Lấy chi tiết tài liệu lỗi:', err);
         res.status(500).json({ error: 'Lỗi hệ thống' });

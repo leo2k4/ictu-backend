@@ -52,7 +52,6 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
         }
 
-        // 🔥 CHẶN USER BỊ BLOCK
         if (user.blocked) {
             return res.status(403).json({
                 error: 'Tài khoản đã bị khóa'
