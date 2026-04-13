@@ -56,6 +56,10 @@ const notificationsRouter = require('./routes/notifications');
 
 app.use('/api/notifications', notificationsRouter);
 
+const reportRoutes = require('./routes/reports');
+
+app.use('/api/reports', reportRoutes);
+
 // Test route
 app.get('/', (req, res) => res.send('VERSION NEW 123'));
 
