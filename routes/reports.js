@@ -73,8 +73,8 @@ router.post('/:documentId', auth, async (req, res) => {
         });
 
     } catch (err) {
-        console.error('REPORT ERROR:', err);
-        res.status(500).json({ error: 'Lỗi hệ thống' });
+        console.error("🔥 REPORT ERROR FULL:", err);
+        res.status(500).json({ error: err.message });
     }
 });
 
