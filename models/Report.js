@@ -1,14 +1,14 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const reportSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Users',
+        ref: 'User',
         required: true
     },
     document_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Documents',
+        ref: 'Document',
         required: true
     },
     reason: {
@@ -25,9 +25,9 @@ const reportSchema = new mongoose.Schema({
         default: 'PENDING'
     }
 }, {
-    timestamps: { createdAt: 'created_at', updatedAt: false }
+    timestamps: { createdAt: 'created_at' }
 });
 
 reportSchema.index({ user_id: 1, document_id: 1 }, { unique: true });
 
-export default mongoose.model('Reports', reportSchema);
+module.exports = mongoose.model('Report', reportSchema);
