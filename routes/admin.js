@@ -210,26 +210,30 @@ router.get('/reports', verifyToken, isAdmin, async (req, res) => {
 
 router.patch('/reports/:id/resolve', verifyToken, isAdmin, async (req, res) => {
     try {
-        const { admin_note } = req.body;
-
         const report = await Report.findById(req.params.id);
+
         if (!report) {
             return res.status(404).json({ error: 'Không tìm thấy report' });
         }
 
+        if (report.status !== 'PENDING') {
+            return res.status(400).json({
+                error: 'Report đã được xử lý trước đó'
+            });
+        }
+
         report.status = 'RESOLVED';
-        report.admin_note = admin_note || '';
         await report.save();
 
         await Notification.create({
             user_id: report.user_id,
             sender_id: req.user.id,
-            type: "REPORT_RESOLVED",
+            type: 'REPORT_RESOLVED',
             document_id: report.document_id,
             is_read: false
         });
 
-        res.json({ message: 'Đã xử lý report', report });
+        res.json(report);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -238,26 +242,30 @@ router.patch('/reports/:id/resolve', verifyToken, isAdmin, async (req, res) => {
 
 router.patch('/reports/:id/reject', verifyToken, isAdmin, async (req, res) => {
     try {
-        const { admin_note } = req.body;
-
         const report = await Report.findById(req.params.id);
+
         if (!report) {
             return res.status(404).json({ error: 'Không tìm thấy report' });
         }
 
+        if (report.status !== 'PENDING') {
+            return res.status(400).json({
+                error: 'Report đã được xử lý trước đó'
+            });
+        }
+
         report.status = 'REJECTED';
-        report.admin_note = admin_note || '';
         await report.save();
 
         await Notification.create({
             user_id: report.user_id,
             sender_id: req.user.id,
-            type: "REPORT_REJECTED",
+            type: 'REPORT_REJECTED',
             document_id: report.document_id,
             is_read: false
         });
 
-        res.json({ message: 'Đã từ chối report', report });
+        res.json(report);
 
     } catch (err) {
         res.status(500).json({ error: err.message });
