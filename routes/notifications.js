@@ -24,7 +24,6 @@ router.patch('/:id/read', auth, async (req, res) => {
         const notification = await Notification.findById(req.params.id);
         if (!notification) return res.status(404).json({ error: 'Không tìm thấy thông báo' });
 
-        // Chỉ user nhận mới được đánh dấu
         if (notification.user_id.toString() !== req.user.id) {
             return res.status(403).json({ error: 'Không có quyền' });
         }

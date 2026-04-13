@@ -12,7 +12,15 @@ const notificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["COMMENT", "LIKE", "APPROVED", "REJECTED"],
+        enum: [
+            "COMMENT",
+            "LIKE",
+            "APPROVED",
+            "REJECTED",
+            "REPORT_SUBMITTED",
+            "REPORT_RESOLVED",
+            "REPORT_REJECTED"
+        ],
         required: true
     },
     document_id: {

@@ -16,7 +16,6 @@ const favoriteSchema = new mongoose.Schema({
 }, { timestamps: { createdAt: 'created_at', updatedAt: false } });
 
 
-// ================= INDEX =================
 favoriteSchema.index({ user_id: 1, document_id: 1 }, { unique: true });
 
 module.exports = mongoose.model('Favorite', favoriteSchema);

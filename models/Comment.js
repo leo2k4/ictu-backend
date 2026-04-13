@@ -29,7 +29,6 @@ const commentSchema = new mongoose.Schema({
 }, { timestamps: { createdAt: 'created_at', updatedAt: false } });
 
 
-// ================= INDEX =================
 commentSchema.index({ document_id: 1 });
 commentSchema.index({ user_id: 1 });
 commentSchema.index({ parent_id: 1 });

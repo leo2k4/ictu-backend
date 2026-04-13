@@ -36,7 +36,6 @@ const documentSchema = new mongoose.Schema({
 }, { timestamps: { createdAt: 'upload_date', updatedAt: false } });
 
 
-// ================= INDEX =================
 documentSchema.index({ subject_id: 1 });
 documentSchema.index({ user_id: 1 });
 documentSchema.index({ status: 1 });
