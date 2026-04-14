@@ -133,7 +133,7 @@ router.get('/favorites', auth, async (req, res) => {
     }
 });
 
-router.get('/users/count', async (req, res) => {
+router.get('/count', async (req, res) => {
     try {
         const totalUsers = await User.countDocuments();
         res.json({ totalUsers });
