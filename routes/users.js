@@ -133,5 +133,14 @@ router.get('/favorites', auth, async (req, res) => {
     }
 });
 
+router.get('/users/count', async (req, res) => {
+    try {
+        const totalUsers = await User.countDocuments();
+        res.json({ totalUsers });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 module.exports = router;
