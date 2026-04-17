@@ -13,23 +13,37 @@ router.post('/ocr', async (req, res) => {
         }
 
         const formData = new FormData();
-        formData.append('base64Image', imageBase64);
-        formData.append('apikey', process.env.OCR_API_KEY);
+
+        const base64Image = imageBase64.startsWith('data:')
+            ? imageBase64
+            : `data:image/jpeg;base64,${imageBase64}`;
+
+        formData.append('base64Image', base64Image);
         formData.append('language', 'eng');
+        formData.append('OCREngine', '2');
 
         const response = await axios.post(
             'https://api.ocr.space/parse/image',
             formData,
-            { headers: formData.getHeaders() }
+            {
+                headers: {
+                    ...formData.getHeaders(),
+                    apikey: process.env.OCR_API_KEY,
+                },
+                maxBodyLength: Infinity
+            }
         );
 
-        const text = response.data?.ParsedResults?.[0]?.ParsedText || '';
+        const text =
+            response.data?.ParsedResults?.[0]?.ParsedText?.trim() || '';
 
-        res.json({ text });
+        console.log("OCR RAW:", response.data);
+
+        return res.json({ text });
 
     } catch (err) {
         console.error("OCR error:", err.response?.data || err.message);
-        res.status(500).json({ message: 'OCR lỗi' });
+        res.status(500).json({ message: 'OCR lỗi', error: err.message });
     }
 });
 
