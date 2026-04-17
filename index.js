@@ -66,8 +66,14 @@ app.get('/', (req, res) => res.send('VERSION NEW 123'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
 const adminRoutes = require('./routes/admin');
-
 app.use('/admin', adminRoutes);
+
+const aiRoutes = require('./routes/ai');
+app.use('/api/ai', aiRoutes);
+
+const ocrRoutes = require('./routes/ocr');
+app.use('/api/ocr', ocrRoutes);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error('🔥 Global Error:', err.message);
