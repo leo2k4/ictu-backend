@@ -213,7 +213,7 @@ router.post('/send-register-otp', async (req, res) => {
                 <p>Hiệu lực 5 phút</p>
             `
         });
-
+        console.log("SEND OTP FOR:", email);
         res.json({ message: 'OTP đăng ký đã gửi' });
 
     } catch (err) {
