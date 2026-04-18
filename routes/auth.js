@@ -214,6 +214,10 @@ router.post('/send-register-otp', async (req, res) => {
             `
         });
         console.log("SEND OTP FOR:", email);
+        const cleanEmail = email.trim().toLowerCase();
+
+        console.log("RAW EMAIL:", email);
+        console.log("CLEAN EMAIL:", cleanEmail);
         res.json({ message: 'OTP đăng ký đã gửi' });
 
     } catch (err) {
@@ -225,20 +229,33 @@ router.post('/verify-register-otp', async (req, res) => {
     try {
         const { email, otp } = req.body;
 
-        const data = await redis.get(`register_otp:${email}`);
-        if (!data) return res.status(400).json({ error: 'Chưa gửi OTP' });
+        const cleanEmail = email.trim().toLowerCase();
+
+        console.log("VERIFY EMAIL:", cleanEmail);
+
+        const key = `register_otp:${cleanEmail}`;
+        const data = await redis.get(key);
+
+        console.log("REDIS KEY:", key);
+        console.log("REDIS DATA:", data);
+
+        if (!data) {
+            return res.status(400).json({ error: 'Chưa gửi OTP' });
+        }
 
         const record = JSON.parse(data);
 
-        if (Date.now() > record.expires)
+        if (Date.now() > record.expires) {
             return res.status(400).json({ error: 'OTP hết hạn' });
+        }
 
-        if (parseInt(otp) !== record.otp)
+        if (parseInt(otp) !== record.otp) {
             return res.status(400).json({ error: 'OTP sai' });
+        }
 
-        await redis.set(`register_verified:${email}`, "true", { EX: 600 });
+        await redis.set(`register_verified:${cleanEmail}`, "true", { EX: 600 });
 
-        res.json({ message: 'OTP hợp lệ' });
+        return res.json({ message: 'OTP hợp lệ' });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
