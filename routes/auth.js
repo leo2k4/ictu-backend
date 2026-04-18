@@ -1,12 +1,14 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const redis = require('../config/redis');
 
 const router = express.Router();
+
 
 // ======================
 // REGISTER
@@ -16,11 +18,11 @@ router.post('/register', async (req, res) => {
         const { name, email, password, student_code, faculty } = req.body;
 
         if (!name || !email || !password) {
-            return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
+            return res.status(400).json({ error: 'Thiếu thông tin' });
         }
 
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
+        const existing = await User.findOne({ email });
+        if (existing) {
             return res.status(400).json({ error: 'Email đã tồn tại' });
         }
 
@@ -29,12 +31,12 @@ router.post('/register', async (req, res) => {
             email,
             password_hash: password,
             student_code,
-            faculty,
+            faculty
         });
 
         await user.save();
 
-        res.status(201).json({ message: 'Đăng ký thành công' });
+        res.status(201).json({ message: 'OK' });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -42,52 +44,24 @@ router.post('/register', async (req, res) => {
 });
 
 
-// ======================
 // LOGIN
-// ======================
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu' });
-        }
-
         const user = await User.findOne({ email }).select('+password_hash');
+        if (!user) return res.status(401).json({ error: 'Sai thông tin' });
 
-        if (!user) {
-            return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
-        }
-
-        if (user.blocked) {
-            return res.status(403).json({ error: 'Tài khoản đã bị khóa' });
-        }
-
-        const isMatch = await user.comparePassword(password);
-
-        if (!isMatch) {
-            return res.status(401).json({ error: 'Email hoặc mật khẩu sai' });
-        }
+        const match = await user.comparePassword(password);
+        if (!match) return res.status(401).json({ error: 'Sai thông tin' });
 
         const token = jwt.sign(
-            {
-                id: user._id,
-                name: user.name,
-                role: user.role
-            },
+            { id: user._id, role: user.role },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        res.json({
-            token,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-            },
-        });
+        res.json({ token, user });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -95,59 +69,49 @@ router.post('/login', async (req, res) => {
 });
 
 
-// ======================
-// OTP STORE (TEMP)
-// ======================
-const otpStore = {};
-const resendLimit = {};
+// EMAIL TRANSPORT
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 
-// ======================
 // FORGOT PASSWORD (SEND OTP)
-// ======================
 router.post('/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ error: 'Thiếu email' });
-        }
-
         const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ error: 'Email không tồn tại' });
-        }
+        if (!user) return res.status(404).json({ error: 'Email không tồn tại' });
 
-        // chống spam (60s)
-        if (resendLimit[email] && Date.now() - resendLimit[email] < 60000) {
-            return res.status(429).json({ error: 'Vui lòng chờ 60s để gửi lại OTP' });
+        const lastSend = await redis.get(`limit:${email}`);
+        if (lastSend) {
+            return res.status(429).json({ error: 'Chờ 60s' });
         }
+        await redis.set(`limit:${email}`, Date.now(), { EX: 60 });
 
         const otp = Math.floor(100000 + Math.random() * 900000);
 
-        otpStore[email] = {
-            otp,
-            expires: Date.now() + 5 * 60 * 1000
-        };
-
-        resendLimit[email] = Date.now();
-
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL,
-                pass: process.env.EMAIL_PASS
-            }
-        });
+        await redis.set(
+            `otp:${email}`,
+            JSON.stringify({
+                otp,
+                expires: Date.now() + 5 * 60 * 1000
+            }),
+            { EX: 300 }
+        );
 
         await transporter.sendMail({
             to: email,
-            subject: 'Mã OTP đặt lại mật khẩu',
+            subject: 'OTP Reset Password',
             html: `
                 <div>
                     <h2>Mã OTP của bạn</h2>
                     <h1 style="color:#4F46E5">${otp}</h1>
-                    <p>Hiệu lực: 5 phút</p>
+                    <p>Hiệu lực 5 phút</p>
                 </div>
             `
         });
@@ -160,46 +124,15 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 
-// ======================
 // VERIFY OTP
-// ======================
-router.post('/verify-otp', (req, res) => {
-    const { email, otp } = req.body;
-
-    const record = otpStore[email];
-
-    if (!record) {
-        return res.status(400).json({ error: 'Chưa gửi OTP' });
-    }
-
-    if (Date.now() > record.expires) {
-        return res.status(400).json({ error: 'OTP đã hết hạn' });
-    }
-
-    if (parseInt(otp) !== record.otp) {
-        return res.status(400).json({ error: 'OTP không đúng' });
-    }
-
-    res.json({ message: 'OTP hợp lệ' });
-});
-
-
-// ======================
-// RESET PASSWORD (SECURE)
-// ======================
-router.post('/reset-password', async (req, res) => {
+router.post('/verify-otp', async (req, res) => {
     try {
-        const { email, otp, newPassword } = req.body;
+        const { email, otp } = req.body;
 
-        if (!email || !otp || !newPassword) {
-            return res.status(400).json({ error: 'Thiếu dữ liệu' });
-        }
+        const data = await redis.get(`otp:${email}`);
+        if (!data) return res.status(400).json({ error: 'Chưa gửi OTP' });
 
-        const record = otpStore[email];
-
-        if (!record) {
-            return res.status(400).json({ error: 'Chưa gửi OTP' });
-        }
+        const record = JSON.parse(data);
 
         if (Date.now() > record.expires) {
             return res.status(400).json({ error: 'OTP hết hạn' });
@@ -209,15 +142,36 @@ router.post('/reset-password', async (req, res) => {
             return res.status(400).json({ error: 'OTP sai' });
         }
 
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ error: 'User không tồn tại' });
+        res.json({ message: 'OK' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// RESET PASSWORD
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+
+        const data = await redis.get(`otp:${email}`);
+        if (!data) return res.status(400).json({ error: 'OTP không tồn tại' });
+
+        const record = JSON.parse(data);
+
+        if (parseInt(otp) !== record.otp) {
+            return res.status(400).json({ error: 'OTP sai' });
         }
+
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ error: 'User không tồn tại' });
 
         user.password_hash = await bcrypt.hash(newPassword, 10);
         await user.save();
 
-        delete otpStore[email];
+        await redis.del(`otp:${email}`);
+        await redis.del(`limit:${email}`);
 
         res.json({ message: 'Đổi mật khẩu thành công' });
 
