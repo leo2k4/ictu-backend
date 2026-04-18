@@ -1,5 +1,4 @@
 require('dotenv').config();
-const redis = require('redis');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -32,19 +31,6 @@ mongoose.connect(process.env.MONGO_URI)
     .catch(err => {
         console.error('MongoDB connection error:', err.message);
     });
-
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL
-});
-
-// Kết nồi redis
-redisClient.connect()
-    .then(() => console.log('Redis connected successfully'))
-    .catch(err => {
-        console.error('Redis connection error:', err.message);
-    });
-
-app.set('redis', redisClient);
 
 //ROUTES
 const authRoutes = require('./routes/auth');
