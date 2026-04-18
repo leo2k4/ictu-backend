@@ -226,19 +226,17 @@ router.post('/verify-register-otp', async (req, res) => {
         const { email, otp } = req.body;
 
         const data = await redis.get(`register_otp:${email}`);
-        if (!data) {
-            return res.status(400).json({ error: 'Chưa gửi OTP' });
-        }
+        if (!data) return res.status(400).json({ error: 'Chưa gửi OTP' });
 
         const record = JSON.parse(data);
 
-        if (Date.now() > record.expires) {
+        if (Date.now() > record.expires)
             return res.status(400).json({ error: 'OTP hết hạn' });
-        }
 
-        if (parseInt(otp) !== record.otp) {
+        if (parseInt(otp) !== record.otp)
             return res.status(400).json({ error: 'OTP sai' });
-        }
+
+        await redis.set(`register_verified:${email}`, "true", { EX: 600 });
 
         res.json({ message: 'OTP hợp lệ' });
 
@@ -247,9 +245,15 @@ router.post('/verify-register-otp', async (req, res) => {
     }
 });
 
+
 router.post('/complete-register', async (req, res) => {
     try {
         const { name, email, password, student_code, faculty } = req.body;
+
+        const verified = await redis.get(`register_verified:${email}`);
+        if (!verified) {
+            return res.status(403).json({ error: 'Chưa xác thực OTP' });
+        }
 
         const existing = await User.findOne({ email });
         if (existing) {
@@ -267,6 +271,7 @@ router.post('/complete-register', async (req, res) => {
         await user.save();
 
         await redis.del(`register_otp:${email}`);
+        await redis.del(`register_verified:${email}`);
 
         res.status(201).json({ message: 'Đăng ký thành công' });
 
