@@ -180,5 +180,100 @@ router.post('/reset-password', async (req, res) => {
     }
 });
 
+router.post('/send-register-otp', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Thiếu email' });
+        }
+
+        const existing = await User.findOne({ email });
+        if (existing) {
+            return res.status(400).json({ error: 'Email đã tồn tại' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000);
+
+        await redis.set(
+            `register_otp:${email}`,
+            JSON.stringify({
+                otp,
+                expires: Date.now() + 5 * 60 * 1000
+            }),
+            { EX: 300 }
+        );
+
+        await transporter.sendMail({
+            to: email,
+            subject: 'Mã xác thực đăng ký ICTU Doc',
+            html: `
+                <h2>Mã OTP đăng ký</h2>
+                <h1 style="color:#4F46E5">${otp}</h1>
+                <p>Hiệu lực 5 phút</p>
+            `
+        });
+
+        res.json({ message: 'OTP đăng ký đã gửi' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/verify-register-otp', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        const data = await redis.get(`register_otp:${email}`);
+        if (!data) {
+            return res.status(400).json({ error: 'Chưa gửi OTP' });
+        }
+
+        const record = JSON.parse(data);
+
+        if (Date.now() > record.expires) {
+            return res.status(400).json({ error: 'OTP hết hạn' });
+        }
+
+        if (parseInt(otp) !== record.otp) {
+            return res.status(400).json({ error: 'OTP sai' });
+        }
+
+        res.json({ message: 'OTP hợp lệ' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/complete-register', async (req, res) => {
+    try {
+        const { name, email, password, student_code, faculty } = req.body;
+
+        const existing = await User.findOne({ email });
+        if (existing) {
+            return res.status(400).json({ error: 'Email đã tồn tại' });
+        }
+
+        const user = new User({
+            name,
+            email,
+            password_hash: password,
+            student_code,
+            faculty
+        });
+
+        await user.save();
+
+        await redis.del(`register_otp:${email}`);
+
+        res.status(201).json({ message: 'Đăng ký thành công' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 module.exports = router;
