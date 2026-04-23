@@ -1,18 +1,15 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const redis = require('../config/redis');
-
+const { OAuth2Client } = require('google-auth-library');
 const router = express.Router();
 
 
-// ======================
 // REGISTER
-// ======================
 router.post('/register', async (req, res) => {
     try {
         const { name, email, password, student_code, faculty } = req.body;
@@ -231,13 +228,8 @@ router.post('/verify-register-otp', async (req, res) => {
 
         const cleanEmail = email.trim().toLowerCase();
 
-        console.log("VERIFY EMAIL:", cleanEmail);
-
         const key = `register_otp:${cleanEmail}`;
         const data = await redis.get(key);
-
-        console.log("REDIS KEY:", key);
-        console.log("REDIS DATA:", data);
 
         if (!data) {
             return res.status(400).json({ error: 'Chưa gửi OTP' });
@@ -297,5 +289,65 @@ router.post('/complete-register', async (req, res) => {
     }
 });
 
+const googleClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID
+);
+
+router.post('/google', async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Missing Google token' });
+        }
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+
+        const { email, name, sub, picture } = payload;
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            user = new User({
+                name,
+                email,
+                password_hash: sub, // tạm cho Google user
+                avatar_url: picture, // ✅ đúng schema của bạn
+                role: 'user',
+                is_verified: true,
+                block: false,
+                created_at: new Date(),
+                last_login: new Date()
+            });
+
+            await user.save();
+        } else {
+            // update last login + avatar
+            user.last_login = new Date();
+            if (!user.avatar_url) user.avatar_url = picture;
+            await user.save();
+        }
+
+        const jwtToken = jwt.sign(
+            { id: user._id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            token: jwtToken,
+            user
+        });
+
+    } catch (err) {
+        console.error('Google login error:', err);
+        res.status(500).json({ error: 'Google login failed' });
+    }
+});
 
 module.exports = router;
