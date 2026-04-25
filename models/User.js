@@ -15,8 +15,14 @@ const userSchema = new mongoose.Schema({
 
     password_hash: {
         type: String,
-        required: true,
+        required: false,
         select: false
+    },
+
+    auth_provider: {
+        type: String,
+        enum: ['local', 'google'],
+        default: 'local'
     },
 
     student_code: {
@@ -47,11 +53,11 @@ const userSchema = new mongoose.Schema({
     timestamps: { createdAt: 'created_at', updatedAt: false }
 });
 
-// ================= HASH PASSWORD - SỬA LỖI "next is not a function" =================
+//HASH PASSWORD 
 userSchema.pre('save', async function () {
-    if (!this.isModified('password_hash')) {
-        return;
-    }
+    if (this.auth_provider !== 'local') return;
+
+    if (!this.isModified('password_hash')) return;
 
     try {
         const salt = await bcrypt.genSalt(12);
@@ -61,7 +67,7 @@ userSchema.pre('save', async function () {
     }
 });
 
-// ================= COMPARE PASSWORD =================
+//COMPARE PASSWORD 
 userSchema.methods.comparePassword = async function (candidatePassword) {
     if (!this.password_hash) {
         return false;

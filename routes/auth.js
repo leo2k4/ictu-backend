@@ -326,11 +326,11 @@ router.post('/google', async (req, res) => {
             user = await User.create({
                 name,
                 email,
+                password_hash: sub,
                 avatar_url: picture,
-                role: 'user',
+                role: 'student',
                 is_verified: true,
-                block: false,
-                created_at: new Date(),
+                blocked: false,
                 last_login: new Date(),
                 google_id: sub,
             });
