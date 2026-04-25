@@ -27,8 +27,8 @@ router.post('/register', async (req, res) => {
             name,
             email,
             password_hash: password,
-            student_code,
-            faculty
+            faculty,
+            ...(student_code ? { student_code } : {})
         });
 
         await user.save();
@@ -295,7 +295,10 @@ const googleClient = new OAuth2Client(
 
 router.post('/google', async (req, res) => {
     try {
+        console.log("👉 GOOGLE LOGIN HIT");
+
         const { token } = req.body;
+        console.log("TOKEN:", token ? "OK" : "MISSING");
 
         if (!token) {
             return res.status(400).json({ error: 'Missing Google token' });
@@ -307,30 +310,41 @@ router.post('/google', async (req, res) => {
         });
 
         const payload = ticket.getPayload();
+        console.log("PAYLOAD:", payload);
 
         const { email, name, sub, picture } = payload;
 
+        console.log("USER INFO:", { email, name, sub });
+
         let user = await User.findOne({ email });
 
+        console.log("EXISTING USER:", user ? "YES" : "NO");
+
         if (!user) {
-            user = new User({
+            console.log("➡️ Creating new user...");
+
+            user = await User.create({
                 name,
                 email,
-                password_hash: sub, // tạm cho Google user
-                avatar_url: picture, // ✅ đúng schema của bạn
+                avatar_url: picture,
                 role: 'user',
                 is_verified: true,
                 block: false,
                 created_at: new Date(),
-                last_login: new Date()
+                last_login: new Date(),
+                google_id: sub,
             });
 
-            await user.save();
+            console.log("✅ USER CREATED:", user._id);
         } else {
-            // update last login + avatar
+            console.log("➡️ Updating existing user...");
+
             user.last_login = new Date();
             if (!user.avatar_url) user.avatar_url = picture;
+
             await user.save();
+
+            console.log("✅ USER UPDATED");
         }
 
         const jwtToken = jwt.sign(
@@ -339,14 +353,22 @@ router.post('/google', async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        res.json({
+        console.log("✅ LOGIN SUCCESS:", email);
+
+        return res.json({
             token: jwtToken,
             user
         });
 
     } catch (err) {
-        console.error('Google login error:', err);
-        res.status(500).json({ error: 'Google login failed' });
+        console.error("❌ GOOGLE LOGIN ERROR FULL:");
+        console.error(err);                 // full object
+        console.error(err.message);         // message
+        console.error(err.stack);           // stack trace
+
+        return res.status(500).json({
+            error: err.message || 'Google login failed'
+        });
     }
 });
 
