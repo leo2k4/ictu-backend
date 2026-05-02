@@ -8,8 +8,12 @@ const Document = require('../models/Document');
 const Comment = require('../models/Comment');
 const Report = require('../models/Report');
 const Notification = require('../models/Notifications');
+const isAdminOrTeacher = authorizeRoles('admin', 'teacher');
 
-const { verifyToken, isAdmin } = auth;
+const { verifyToken, isAdmin, isAdminOrTeacher } = auth;
+
+
+
 
 
 router.get('/stats', verifyToken, isAdmin, async (req, res) => {
@@ -31,7 +35,7 @@ router.get('/stats', verifyToken, isAdmin, async (req, res) => {
 });
 
 // GET /admin/documents/pending
-router.get('/documents/pending', verifyToken, isAdmin, async (req, res) => {
+router.get('/documents/pending', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const pendingDocs = await Document.find({ status: 'pending' })
             .populate('user_id', 'name email')
@@ -43,7 +47,7 @@ router.get('/documents/pending', verifyToken, isAdmin, async (req, res) => {
 });
 
 // PATCH /admin/documents/:id/approve
-router.patch('/documents/:id/approve', verifyToken, isAdmin, async (req, res) => {
+router.patch('/documents/:id/approve', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const doc = await Document.findByIdAndUpdate(req.params.id, { status: 'approved' }, { new: true });
         res.json(doc);
@@ -53,7 +57,7 @@ router.patch('/documents/:id/approve', verifyToken, isAdmin, async (req, res) =>
 });
 
 // PATCH /admin/documents/:id/reject
-router.patch('/documents/:id/reject', verifyToken, isAdmin, async (req, res) => {
+router.patch('/documents/:id/reject', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const doc = await Document.findByIdAndUpdate(req.params.id, { status: 'rejected' }, { new: true });
         res.json(doc);
@@ -63,7 +67,7 @@ router.patch('/documents/:id/reject', verifyToken, isAdmin, async (req, res) => 
 });
 
 // GET /admin/documents 
-router.get('/documents', verifyToken, isAdmin, async (req, res) => {
+router.get('/documents', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const { status, keyword } = req.query;
 
@@ -91,7 +95,7 @@ router.get('/documents', verifyToken, isAdmin, async (req, res) => {
 });
 
 // DELETE /admin/documents/:id
-router.delete('/documents/:id', verifyToken, isAdmin, async (req, res) => {
+router.delete('/documents/:id', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const doc = await Document.findByIdAndDelete(req.params.id);
 
@@ -181,7 +185,7 @@ router.patch('/users/:id/block', verifyToken, isAdmin, async (req, res) => {
 });
 
 // GET /admin/comments
-router.get('/comments', verifyToken, isAdmin, async (req, res) => {
+router.get('/comments', verifyToken, isAdminOrTeacher, async (req, res) => {
     const comments = await Comment.find()
         .populate('user_id', 'name email')
         .populate('document_id', 'title')
@@ -190,12 +194,12 @@ router.get('/comments', verifyToken, isAdmin, async (req, res) => {
 });
 
 // DELETE /admin/comments/:id
-router.delete('/comments/:id', verifyToken, isAdmin, async (req, res) => {
+router.delete('/comments/:id', verifyToken, isAdminOrTeacher, async (req, res) => {
     await Comment.findByIdAndDelete(req.params.id);
     res.json({ success: true });
 });
 
-router.get('/reports', verifyToken, isAdmin, async (req, res) => {
+router.get('/reports', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const reports = await Report.find()
             .populate('user_id', 'name email')
@@ -208,7 +212,7 @@ router.get('/reports', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-router.patch('/reports/:id/resolve', verifyToken, isAdmin, async (req, res) => {
+router.patch('/reports/:id/resolve', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const report = await Report.findById(req.params.id);
 
@@ -240,7 +244,7 @@ router.patch('/reports/:id/resolve', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-router.patch('/reports/:id/reject', verifyToken, isAdmin, async (req, res) => {
+router.patch('/reports/:id/reject', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const report = await Report.findById(req.params.id);
 
@@ -272,4 +276,5 @@ router.patch('/reports/:id/reject', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
+module.exports.isAdminOrTeacher = isAdminOrTeacher;
 module.exports = router;
