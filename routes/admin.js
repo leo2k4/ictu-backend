@@ -15,7 +15,7 @@ const { verifyToken, isAdmin, isAdminOrTeacher } = auth;
 
 
 
-router.get('/stats', verifyToken, isAdmin, async (req, res) => {
+router.get('/stats', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const totalUsers = await User.countDocuments();
         const totalDocuments = await Document.countDocuments();
