@@ -8,7 +8,6 @@ const Document = require('../models/Document');
 const Comment = require('../models/Comment');
 const Report = require('../models/Report');
 const Notification = require('../models/Notifications');
-const isAdminOrTeacher = authorizeRoles('admin', 'teacher');
 
 const { verifyToken, isAdmin, isAdminOrTeacher } = auth;
 
@@ -276,5 +275,4 @@ router.patch('/reports/:id/reject', verifyToken, isAdminOrTeacher, async (req, r
     }
 });
 
-module.exports.isAdminOrTeacher = isAdminOrTeacher;
 module.exports = router;
