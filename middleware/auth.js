@@ -50,9 +50,9 @@ const isAdmin = authorizeRoles('admin');
 const isAdminOrTeacher = authorizeRoles('admin', 'teacher');
 
 
-module.exports = {
-    verifyToken,
-    authorizeRoles,
-    isAdmin,
-    isAdminOrTeacher
-};
+module.exports = verifyToken;
+
+module.exports.verifyToken = verifyToken;
+module.exports.authorizeRoles = authorizeRoles;
+module.exports.isAdmin = isAdmin;
+module.exports.isAdminOrTeacher = isAdminOrTeacher;
