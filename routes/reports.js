@@ -103,8 +103,15 @@ router.patch('/:id/resolve', auth, async (req, res) => {
         }
 
         // 1. update document
-        document.status = action;
-        await document.save();
+        if (action === 'hidden') {
+            document.status = 'hidden';
+            await document.save();
+        }
+
+        if (action === 'removed') {
+            document.status = 'removed';
+            await document.save();
+        }
 
         // 2. update report
         report.status = 'RESOLVED';
