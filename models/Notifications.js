@@ -19,7 +19,9 @@ const notificationSchema = new mongoose.Schema({
             "REJECTED",
             "REPORT_SUBMITTED",
             "REPORT_RESOLVED",
-            "REPORT_REJECTED"
+            "REPORT_REJECTED",
+            "DOCUMENT_HIDDEN",
+            "DOCUMENT_REMOVED"
         ],
         required: true
     },
@@ -30,6 +32,10 @@ const notificationSchema = new mongoose.Schema({
     comment_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Comment"
+    },
+    reason: {
+        type: String,
+        trim: true
     },
     is_read: {
         type: Boolean,

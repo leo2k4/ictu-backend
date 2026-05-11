@@ -78,4 +78,58 @@ router.post('/:documentId', auth, async (req, res) => {
     }
 });
 
+router.patch('/:id/resolve', auth, async (req, res) => {
+    try {
+        const { action, reason } = req.body;
+
+        if (!['hidden', 'removed'].includes(action)) {
+            return res.status(400).json({
+                error: 'Action không hợp lệ'
+            });
+        }
+
+        const report = await Report.findById(req.params.id);
+        if (!report) {
+            return res.status(404).json({
+                error: 'Không tìm thấy report'
+            });
+        }
+
+        const document = await Document.findById(report.document_id);
+        if (!document) {
+            return res.status(404).json({
+                error: 'Không tìm thấy document'
+            });
+        }
+
+        // 1. update document
+        document.status = action;
+        await document.save();
+
+        // 2. update report
+        report.status = 'RESOLVED';
+        await report.save();
+
+        // 3. tạo notification cho chủ bài viết
+        await Notification.create({
+            user_id: document.user_id,
+            sender_id: req.user.id,
+            type: action === 'hidden'
+                ? 'DOCUMENT_HIDDEN'
+                : 'DOCUMENT_REMOVED',
+            document_id: document._id,
+            reason: reason
+        });
+
+        return res.json({
+            message: 'Xử lý report thành công'
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            error: 'Lỗi server'
+        });
+    }
+});
 module.exports = router;
