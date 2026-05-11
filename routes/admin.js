@@ -11,10 +11,6 @@ const Notification = require('../models/Notifications');
 
 const { verifyToken, isAdmin, isAdminOrTeacher } = auth;
 
-
-
-
-
 router.get('/stats', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const totalUsers = await User.countDocuments();
@@ -49,6 +45,16 @@ router.get('/documents/pending', verifyToken, isAdminOrTeacher, async (req, res)
 router.patch('/documents/:id/approve', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const doc = await Document.findByIdAndUpdate(req.params.id, { status: 'approved' }, { new: true });
+
+        // Tạo notification cho người upload
+        await Notification.create({
+            user_id: doc.user_id,
+            sender_id: req.user.id,
+            type: 'APPROVED',
+            document_id: doc._id,
+            is_read: false
+        });
+
         res.json(doc);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -59,6 +65,17 @@ router.patch('/documents/:id/approve', verifyToken, isAdminOrTeacher, async (req
 router.patch('/documents/:id/reject', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const doc = await Document.findByIdAndUpdate(req.params.id, { status: 'rejected' }, { new: true });
+
+        // Tạo notification cho người upload
+        await Notification.create({
+            user_id: doc.user_id,
+            sender_id: req.user.id,
+            type: 'REJECTED',
+            document_id: doc._id,
+            reason: req.body.reason || 'Tài liệu không đáp ứng tiêu chuẩn',
+            is_read: false
+        });
+
         res.json(doc);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -71,7 +88,6 @@ router.get('/documents', verifyToken, isAdminOrTeacher, async (req, res) => {
         const { status, keyword } = req.query;
 
         let query = {};
-
 
         if (status && status !== 'all') {
             query.status = status;
@@ -137,7 +153,6 @@ router.get('/users', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-
 // PATCH /admin/users/:id/role  
 router.patch('/users/:id/role', verifyToken, isAdmin, async (req, res) => {
     try {
@@ -159,7 +174,6 @@ router.patch('/users/:id/role', verifyToken, isAdmin, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 // PATCH /admin/users/:id/block 
 router.patch('/users/:id/block', verifyToken, isAdmin, async (req, res) => {
@@ -185,25 +199,36 @@ router.patch('/users/:id/block', verifyToken, isAdmin, async (req, res) => {
 
 // GET /admin/comments
 router.get('/comments', verifyToken, isAdminOrTeacher, async (req, res) => {
-    const comments = await Comment.find()
-        .populate('user_id', 'name email')
-        .populate('document_id', 'title')
-        .sort({ createdAt: -1 });
-    res.json(comments);
+    try {
+        const comments = await Comment.find()
+            .populate('user_id', 'name email')
+            .populate('document_id', 'title')
+            .sort({ created_at: -1 });
+        res.json(comments);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // DELETE /admin/comments/:id
 router.delete('/comments/:id', verifyToken, isAdminOrTeacher, async (req, res) => {
-    await Comment.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    try {
+        await Comment.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
+// ==================== REPORTS ====================
+
+// GET /admin/reports - Lấy danh sách reports
 router.get('/reports', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const reports = await Report.find()
             .populate('user_id', 'name email')
-            .populate('document_id', 'title')
-            .sort({ createdAt: -1 });
+            .populate('document_id', 'title file_url user_id')
+            .sort({ created_at: -1 });
 
         res.json(reports);
     } catch (err) {
@@ -211,10 +236,19 @@ router.get('/reports', verifyToken, isAdminOrTeacher, async (req, res) => {
     }
 });
 
+// FIXED: Xử lý report (ẩn hoặc xóa document)
 router.patch('/reports/:id/resolve', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
-        const report = await Report.findById(req.params.id);
+        const { action, reason } = req.body;
 
+        // Validate action
+        if (!['hidden', 'removed'].includes(action)) {
+            return res.status(400).json({
+                error: 'Action không hợp lệ. Chấp nhận: hidden, removed'
+            });
+        }
+
+        const report = await Report.findById(req.params.id);
         if (!report) {
             return res.status(404).json({ error: 'Không tìm thấy report' });
         }
@@ -225,24 +259,57 @@ router.patch('/reports/:id/resolve', verifyToken, isAdminOrTeacher, async (req, 
             });
         }
 
+        const document = await Document.findById(report.document_id);
+        if (!document) {
+            return res.status(404).json({ error: 'Không tìm thấy document' });
+        }
+
+        // 1. Update document status
+        if (action === 'hidden') {
+            document.status = 'hidden';
+            await document.save();
+        } else if (action === 'removed') {
+            document.status = 'removed';
+            await document.save();
+        }
+
+        // 2. Update report status
         report.status = 'RESOLVED';
         await report.save();
 
+        // 3. Create notification for document owner
+        await Notification.create({
+            user_id: document.user_id,
+            sender_id: req.user.id,
+            type: action === 'hidden' ? 'DOCUMENT_HIDDEN' : 'DOCUMENT_REMOVED',
+            document_id: document._id,
+            reason: reason || (action === 'hidden' ? 'Tài liệu bị ẩn do vi phạm' : 'Tài liệu bị xóa do vi phạm'),
+            is_read: false
+        });
+
+        // 4. Create notification for reporter (optional)
         await Notification.create({
             user_id: report.user_id,
             sender_id: req.user.id,
             type: 'REPORT_RESOLVED',
-            document_id: report.document_id,
+            document_id: document._id,
+            reason: `Báo cáo của bạn đã được xử lý. Tài liệu đã bị ${action === 'hidden' ? 'ẩn' : 'xóa'}.`,
             is_read: false
         });
 
-        res.json(report);
+        res.json({
+            message: `Đã ${action === 'hidden' ? 'ẩn' : 'xóa'} tài liệu và xử lý report thành công`,
+            report: report,
+            document: document
+        });
 
     } catch (err) {
+        console.error('Lỗi khi xử lý report:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
+// Từ chối report (không xử lý document)
 router.patch('/reports/:id/reject', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
         const report = await Report.findById(req.params.id);
@@ -257,20 +324,27 @@ router.patch('/reports/:id/reject', verifyToken, isAdminOrTeacher, async (req, r
             });
         }
 
+        // Chỉ update status, không động đến document
         report.status = 'REJECTED';
         await report.save();
 
+        // Tạo notification cho người báo cáo
         await Notification.create({
             user_id: report.user_id,
             sender_id: req.user.id,
             type: 'REPORT_REJECTED',
             document_id: report.document_id,
+            reason: req.body.reason || 'Báo cáo của bạn không được chấp thuận',
             is_read: false
         });
 
-        res.json(report);
+        res.json({
+            message: 'Đã từ chối report',
+            report: report
+        });
 
     } catch (err) {
+        console.error('Lỗi khi từ chối report:', err);
         res.status(500).json({ error: err.message });
     }
 });
