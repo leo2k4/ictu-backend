@@ -142,5 +142,45 @@ router.get('/count', async (req, res) => {
     }
 });
 
+router.post('/change-password', auth, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        // Validate input
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Vui lòng nhập đầy đủ thông tin' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+        }
+
+        // Lấy user hiện tại (bao gồm password_hash)
+        const user = await User.findById(req.user.id).select('+password_hash');
+        if (!user) {
+            return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+        }
+
+        // Kiểm tra mật khẩu hiện tại
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Mật khẩu hiện tại không đúng' });
+        }
+
+        // Cập nhật mật khẩu mới
+        user.password_hash = newPassword;
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Đổi mật khẩu thành công'
+        });
+
+    } catch (err) {
+        console.error('Lỗi đổi mật khẩu:', err);
+        res.status(500).json({ error: err.message || 'Lỗi server' });
+    }
+});
+
 
 module.exports = router;
