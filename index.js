@@ -85,6 +85,9 @@ app.use((err, req, res, next) => {
 
 app.use('/uploads', express.static('uploads'));
 
+const aiSearchRoutes = require('./routes/aiSearch');
+app.use('/api/ai-search', aiSearchRoutes);
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
