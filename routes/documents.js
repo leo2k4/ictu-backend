@@ -38,12 +38,6 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
 
         // ===== DEBUG CLOUDINARY =====
         console.log("===== UPLOAD FILE =====");
-        console.log("Original name:", req.file.originalname);
-        console.log("Mime type:", req.file.mimetype);
-        console.log("Path:", req.file.path);
-        console.log("Filename:", req.file.filename);
-        console.log("Resource type:", req.file.resource_type);
-        console.log("Format:", req.file.format);
         console.log(req.file);
         console.log("=======================");
         // ============================
