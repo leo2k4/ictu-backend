@@ -8,6 +8,7 @@ const Document = require('../models/Document');
 const Comment = require('../models/Comment');
 const Report = require('../models/Report');
 const Notification = require('../models/Notifications');
+const Favorite = require('../models/Favorite');
 
 const { verifyToken, isAdmin, isAdminOrTeacher } = auth;
 
@@ -112,14 +113,23 @@ router.get('/documents', verifyToken, isAdminOrTeacher, async (req, res) => {
 // DELETE /admin/documents/:id
 router.delete('/documents/:id', verifyToken, isAdminOrTeacher, async (req, res) => {
     try {
-        const doc = await Document.findByIdAndDelete(req.params.id);
-
+        const doc = await Document.findById(req.params.id);
         if (!doc) {
             return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
         }
 
-        res.json({ message: 'Đã xóa tài liệu' });
+        // Xóa tất cả dữ liệu liên quan
+        await Promise.all([
+            Favorite.deleteMany({ document_id: req.params.id }),
+            Notification.deleteMany({ document_id: req.params.id }),
+            Comment.deleteMany({ document_id: req.params.id }),
+            Report.deleteMany({ document_id: req.params.id }),
+            Document.findByIdAndDelete(req.params.id)
+        ]);
+
+        res.json({ message: 'Đã xóa tài liệu và các dữ liệu liên quan' });
     } catch (err) {
+        console.error('Xóa tài liệu lỗi:', err);
         res.status(500).json({ error: err.message });
     }
 });

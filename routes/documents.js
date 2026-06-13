@@ -7,6 +7,8 @@ const auth = require('../middleware/auth');
 const Document = require('../models/Document');
 const Favorite = require('../models/Favorite');
 const Notification = require('../models/Notifications');
+const Comment = require('../models/Comment');
+const Report = require('../models/Report');
 
 const router = express.Router();
 
@@ -164,7 +166,12 @@ router.get('/favorites', auth, async (req, res) => {
             })
             .sort({ created_at: -1 });
 
-        res.json(favorites.map(f => f.document_id));
+        // Lọc bỏ document bị null (đã bị xóa)
+        const validFavorites = favorites
+            .filter(f => f.document_id !== null)
+            .map(f => f.document_id);
+
+        res.json(validFavorites);
 
     } catch (err) {
         console.error(err);
@@ -191,14 +198,19 @@ router.delete('/:id', auth, async (req, res) => {
         const doc = await Document.findById(req.params.id);
         if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
 
-        if (doc.user_id.toString() !== req.user.id) {
+        if (doc.user_id.toString() !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ error: 'Không có quyền xóa tài liệu này' });
         }
 
-        await Favorite.deleteMany({ document_id: req.params.id });
+        // Xóa tất cả dữ liệu liên quan
+        await Promise.all([
+            Favorite.deleteMany({ document_id: req.params.id }),
+            Notification.deleteMany({ document_id: req.params.id }),
+            Comment.deleteMany({ document_id: req.params.id }),
+            Report.deleteMany({ document_id: req.params.id }),
+        ]);
 
-        await Notification.deleteMany({ document_id: req.params.id });
-
+        // Xóa file trên Cloudinary
         if (doc.file_url) {
             try {
                 const urlParts = doc.file_url.split('/');
@@ -211,7 +223,7 @@ router.delete('/:id', auth, async (req, res) => {
 
         await doc.deleteOne();
 
-        res.json({ message: 'Xóa tài liệu thành công' });
+        res.json({ message: 'Xóa tài liệu và các dữ liệu liên quan thành công' });
 
     } catch (err) {
         console.error('Xóa tài liệu lỗi:', err);
@@ -255,7 +267,7 @@ router.get('/:id', auth, async (req, res) => {
             return res.status(404).json({ error: 'Tài liệu không tồn tại' });
         }
 
-        // ✅ CHẶN USER THƯỜNG
+        // Chặn user thường xem tài liệu chưa duyệt
         if (doc.status !== 'approved' && req.user.role !== 'admin') {
             return res.status(403).json({
                 error: 'Tài liệu chưa được duyệt'
