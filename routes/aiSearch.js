@@ -65,7 +65,7 @@ LƯU Ý: Nếu dùng external, url PHẢI là link thật, có thể truy cập 
 
         // Bước 3: Gọi Gemini API
         const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
             {
                 contents: [{ parts: [{ text: prompt }] }]
             }
