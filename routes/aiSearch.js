@@ -57,7 +57,7 @@ VÍ DỤ external đúng:
   "reason": "Tài liệu ôn tập phù hợp với yêu cầu",
   "score": 90,
   "source": "external",
-  "url": "https://tailieu.vn/de-thi/de-on-thi-anh-van-1.html"
+  "url": "https://www.studocu.vn/vn/document/dai-hoc-nong-lam-thanh-pho-ho-chi-minh/anh-van-1/de-thi-thu-on-thi/94239147"
 }
 
 LƯU Ý: Nếu dùng external, url PHẢI là link thật, có thể truy cập được.
