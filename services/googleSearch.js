@@ -2,28 +2,29 @@ const axios = require("axios");
 
 async function searchGoogle(query) {
     try {
-        const { data } = await axios.get(
-            "https://www.googleapis.com/customsearch/v1",
+        const { data } = await axios.post(
+            "https://google.serper.dev/search",
             {
-                params: {
-                    key: process.env.GOOGLE_SEARCH_API_KEY,
-                    cx: process.env.GOOGLE_SEARCH_ENGINE_ID,
-                    q: query,
-                    num: 10
+                q: query,
+                num: 10
+            },
+            {
+                headers: {
+                    'X-API-KEY': process.env.SERPER_API_KEY,
+                    'Content-Type': 'application/json'
                 }
             }
         );
 
-        return (data.items || []).map(item => ({
+        const items = data.organic || [];
+
+        return items.map(item => ({
             title: item.title,
             url: item.link,
             snippet: item.snippet
         }));
     } catch (err) {
-        console.error(
-            "Google Search Error:",
-            err.response?.data || err.message
-        );
+        console.error("Serper Search Error:", err.response?.data || err.message);
         return [];
     }
 }
