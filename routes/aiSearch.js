@@ -1,12 +1,11 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const Fuse = require('fuse.js');  // <=== THÊM DÒNG NÀY
+const Fuse = require('fuse.js');
 
 const Document = require('../models/Document');
 const searchGoogle = require('../services/googleSearch');
 
-// <=== THÊM HÀM LOẠI BỎ DẤU (dùng cho Fuse)
 const removeAccents = (str) => {
     if (!str) return '';
     str = str.toLowerCase();
@@ -25,21 +24,18 @@ router.post('/search', async (req, res) => {
         const { query } = req.body;
 
         if (!query?.trim()) {
-            return res.status(400).json({
-                message: 'Thiếu câu hỏi'
-            });
+            return res.status(400).json({ message: 'Thiếu câu hỏi' });
         }
 
         // =========================
-        // 1. Lấy tài liệu internal
+        // Bước 1: Lấy ALL internal documents
         // =========================
-
-        const allDocuments = await Document.find({
-            status: 'approved'
-        })
+        const allDocuments = await Document.find({ status: 'approved' })
             .populate('subject_id', 'name');
 
-        // <=== THÊM BƯỚC LỌC FUSE (lấy TOP 5 tài liệu khớp nhất)
+        // =========================
+        // Bước 2: Dùng Fuse lọc TOP 5 internal khớp nhất
+        // =========================
         const normalizedQuery = removeAccents(query);
 
         const docsForFuse = allDocuments.map(doc => ({
@@ -59,131 +55,115 @@ router.post('/search', async (req, res) => {
         });
 
         const fuseResults = fuse.search(normalizedQuery);
-        const documents = fuseResults.slice(0, 5).map(r => r.item);  // <=== CHỈ LẤY TOP 5
+        const topInternal = fuseResults.slice(0, 5).map(r => r.item);
+
+        console.log(`\n===== TOP 5 INTERNAL =====`);
+        topInternal.forEach((doc, i) => {
+            const score = Math.round((1 - fuseResults[i]?.score) * 100);
+            console.log(`${i + 1}. ${doc.title} (độ khớp: ${score}%)`);
+        });
 
         // =========================
-        // 2. Search Google (SỬA QUERY)
+        // Bước 3: Gọi Google Search lấy TOP 5 external
         // =========================
+        const searchQuery = `${query} (giáo trình OR "bài giảng" OR "tài liệu học tập") cho sinh viên filetype:pdf`;
+        let rawGoogleResults = await searchGoogle(searchQuery);
 
-        const searchQuery = `${query} (giáo trình OR "bài giảng" OR "tài liệu học tập") filetype:pdf`;
-
-        let googleResults = [];
-
-        // <=== SỬA: chỉ 1 query thay vì vòng lặp
-        const results = await searchGoogle(searchQuery);
-        googleResults.push(...results);
-
-        // Remove duplicate URL
-        googleResults = googleResults.filter(
-            (item, index, self) =>
-                index === self.findIndex(x => x.url === item.url)
+        // Lọc trùng URL và lấy TOP 5
+        const uniqueGoogle = rawGoogleResults.filter(
+            (item, index, self) => index === self.findIndex(x => x.url === item.url)
         );
+        const topExternal = uniqueGoogle.slice(0, 5);
 
-        googleResults = googleResults.slice(0, 15);
-
-        // =========================
-        // 3. Prompt Gemini
-        // =========================
-
-        const prompt = `
-
-Bạn là trợ lý tìm kiếm tài liệu học tập.
-
-DANH SÁCH TÀI LIỆU INTERNAL:
-
-${documents.map((doc, idx) => `${idx + 1}.
-ID: ${doc._id}
-Tiêu đề: ${doc.title}
-Mô tả: ${doc.description || 'Không có'}
-Môn học: ${doc.subject_id?.name || 'Chưa phân loại'}`).join('\n')}
-
-KẾT QUẢ GOOGLE:
-
-${googleResults.map((item, idx) => `${idx + 1}.
-Tiêu đề: ${item.title}
-URL: ${item.url}
-Mô tả: ${item.snippet}`).join('\n')}
-
-CÂU HỎI:
-"${query}"
-
-QUY TẮC:
-
-1. Ưu tiên tài liệu INTERNAL.
-
-2. Nếu INTERNAL không phù hợp:
-   chọn từ GOOGLE RESULTS.
-
-3. TUYỆT ĐỐI KHÔNG:
-
-   * tạo URL mới
-   * sửa URL
-   * bịa tài liệu
-
-4. Nếu chọn external:
-   URL phải lấy nguyên văn từ GOOGLE RESULTS.
-
-5. Chọn tối đa 5 tài liệu.
-
-TRẢ VỀ JSON DUY NHẤT:
-
-{
-"answer": "string",
-"documents": [
-{
-"id": "id hoặc null",
-"title": "string",
-"reason": "string",
-"score": 90,
-"source": "internal hoặc external",
-"url": "url hoặc null"
-}
-]
-}
-`;
+        console.log(`\n===== TOP 5 EXTERNAL =====`);
+        topExternal.forEach((item, i) => {
+            console.log(`${i + 1}. ${item.title}`);
+        });
 
         // =========================
-        // 4. Call Gemini
+        // Bước 4: GỘP 5 internal + 5 external = 10 tài liệu
         // =========================
-
-        const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            {
-                contents: [
-                    {
-                        parts: [
-                            {
-                                text: prompt
-                            }
-                        ]
-                    }
-                ]
-            }
-        );
-
-        const aiText =
-            geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-            '{}';
-
-        let aiResponse = {
-            answer: '',
-            documents: []
+        const combinedDocs = {
+            internal: topInternal,
+            external: topExternal
         };
 
-        try {
-            const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+        // =========================
+        // Bước 5: Xây dựng prompt gửi Gemini
+        // =========================
+        let prompt = `Bạn là trợ lý tìm kiếm tài liệu học tập.
 
-            if (jsonMatch) {
-                aiResponse = JSON.parse(jsonMatch[0]);
+CÂU HỎI: "${query}"
+
+QUY TẮC QUAN TRỌNG:
+1. Ưu tiên chọn tài liệu từ INTERNAL nếu phù hợp.
+2. Nếu INTERNAL không có cái nào phù hợp, chọn từ EXTERNAL.
+3. TUYỆT ĐỐI KHÔNG bịa URL, không tạo tài liệu mới.
+4. Chọn tối đa 5 tài liệu.
+
+`;
+
+        if (topInternal.length > 0) {
+            prompt += `\nDANH SÁCH TÀI LIỆU INTERNAL (ưu tiên chọn từ đây):\n`;
+            prompt += topInternal.map((doc, idx) => `${idx + 1}.
+ID: ${doc._id}
+Tiêu đề: ${doc.title}
+Môn học: ${doc.subject_id?.name || 'Chưa phân loại'}
+Mô tả: ${doc.description || 'Không có mô tả'}`).join('\n');
+        }
+
+        if (topExternal.length > 0) {
+            prompt += `\n\nDANH SÁCH TÀI LIỆU EXTERNAL (chỉ chọn nếu internal không phù hợp):\n`;
+            prompt += topExternal.map((item, idx) => `${idx + 1}.
+Tiêu đề: ${item.title}
+URL: ${item.url}
+Mô tả: ${item.snippet}`).join('\n');
+        }
+
+        prompt += `
+
+TRẢ VỀ JSON DUY NHẤT (không kèm text khác):
+{
+  "answer": "câu trả lời bằng tiếng Việt, ngắn gọn",
+  "documents": [
+    {
+      "id": "ID (nếu internal) hoặc null",
+      "title": "tiêu đề tài liệu",
+      "reason": "lý do chọn",
+      "score": 90,
+      "source": "internal hoặc external",
+      "url": "url (nếu external)"
+    }
+  ]
+}`;
+
+        // =========================
+        // Bước 6: Gọi Gemini
+        // =========================
+        let aiResponse = { answer: '', documents: [] };
+
+        if (topInternal.length > 0 || topExternal.length > 0) {
+            const geminiResponse = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                { contents: [{ parts: [{ text: prompt }] }] }
+            );
+
+            let aiText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+            aiText = aiText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+            try {
+                const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    aiResponse = JSON.parse(jsonMatch[0]);
+                }
+            } catch (error) {
+                console.error('Parse Gemini JSON error:', error);
             }
-        } catch (error) {
-            console.error('Parse Gemini JSON error:', error);
         }
 
         // =========================
-        // 5. Build results
+        // Bước 7: Build kết quả trả về client
         // =========================
-
         const internalDocs = [];
         const externalDocs = [];
 
@@ -192,7 +172,6 @@ TRẢ VỀ JSON DUY NHẤT:
                 const fullDoc = await Document.findById(doc.id)
                     .populate('subject_id', 'name')
                     .populate('user_id', 'name');
-
                 if (fullDoc) {
                     internalDocs.push({
                         ...fullDoc.toObject(),
@@ -203,49 +182,28 @@ TRẢ VỀ JSON DUY NHẤT:
                 }
             }
 
-            if (
-                doc.source === 'external' &&
-                doc.url &&
-                googleResults.some(g => g.url === doc.url)
-            ) {
+            if (doc.source === 'external' && doc.url && topExternal.some(e => e.url === doc.url)) {
                 externalDocs.push({
                     _id: `ext_${Date.now()}_${externalDocs.length}`,
                     title: doc.title,
-                    description:
-                        doc.reason || 'Tài liệu tham khảo từ Google',
-
+                    description: doc.reason || 'Tài liệu tham khảo từ Google',
                     file_url: doc.url,
                     file_type: 'external',
-
                     source: 'external',
-
                     aiReason: doc.reason,
                     aiScore: doc.score,
-
-                    subject_id: {
-                        name: '📡 Google Search'
-                    },
-
-                    user_id: {
-                        name: 'Google'
-                    },
-
+                    subject_id: { name: '📡 Google Search' },
+                    user_id: { name: 'Google' },
                     download_count: 0
                 });
             }
         }
 
-        // =========================
-        // 6. Fallback
-        // =========================
+        let results = internalDocs.length > 0 ? internalDocs : externalDocs;
 
-        let results =
-            internalDocs.length > 0
-                ? internalDocs
-                : externalDocs;
-
-        if (results.length === 0) {
-            results = googleResults.slice(0, 5).map((item, index) => ({
+        // Fallback nếu Gemini không chọn được gì
+        if (results.length === 0 && topExternal.length > 0) {
+            results = topExternal.slice(0, 5).map((item, index) => ({
                 _id: `fallback_${index}`,
                 title: item.title,
                 description: item.snippet,
@@ -254,31 +212,27 @@ TRẢ VỀ JSON DUY NHẤT:
                 source: 'external',
                 aiReason: 'Kết quả tìm kiếm phù hợp',
                 aiScore: 70,
-                subject_id: {
-                    name: '📡 Google Search'
-                },
-                user_id: {
-                    name: 'Google'
-                },
+                subject_id: { name: '📡 Google Search' },
+                user_id: { name: 'Google' },
                 download_count: 0
             }));
         }
 
-        // =========================
-        // 7. Answer
-        // =========================
-
         let answer = aiResponse.answer;
-
         if (!answer) {
             if (internalDocs.length > 0) {
                 answer = `📚 Tìm thấy ${internalDocs.length} tài liệu trong hệ thống.`;
             } else if (results.length > 0) {
-                answer = `🔍 Không tìm thấy tài liệu phù hợp trong hệ thống, đây là các nguồn tham khảo từ Google.`;
+                answer = `🔍 Không có tài liệu nội bộ phù hợp, hiển thị ${results.length} kết quả từ web.`;
             } else {
                 answer = `😔 Không tìm thấy tài liệu phù hợp với "${query}".`;
             }
         }
+
+        console.log(`\n===== KẾT QUẢ CUỐI =====`);
+        console.log(`Internal chọn: ${internalDocs.length}`);
+        console.log(`External chọn: ${externalDocs.length}`);
+        console.log(`Tổng: ${results.length}`);
 
         return res.json({
             query,
@@ -288,11 +242,7 @@ TRẢ VỀ JSON DUY NHẤT:
         });
 
     } catch (err) {
-        console.error(
-            'AI Search error:',
-            err.response?.data || err.message
-        );
-
+        console.error('AI Search error:', err.response?.data || err.message);
         return res.status(500).json({
             query: req.body.query,
             answer: 'Có lỗi xảy ra, vui lòng thử lại sau.',
@@ -300,7 +250,6 @@ TRẢ VỀ JSON DUY NHẤT:
             count: 0
         });
     }
-
 });
 
 module.exports = router;
