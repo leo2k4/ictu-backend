@@ -1,9 +1,24 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const Fuse = require('fuse.js');  // <=== THÊM DÒNG NÀY
 
 const Document = require('../models/Document');
 const searchGoogle = require('../services/googleSearch');
+
+// <=== THÊM HÀM LOẠI BỎ DẤU (dùng cho Fuse)
+const removeAccents = (str) => {
+    if (!str) return '';
+    str = str.toLowerCase();
+    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, 'a');
+    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, 'e');
+    str = str.replace(/ì|í|ị|ỉ|ĩ/g, 'i');
+    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, 'o');
+    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, 'u');
+    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, 'y');
+    str = str.replace(/đ/g, 'd');
+    return str;
+};
 
 router.post('/search', async (req, res) => {
     try {
@@ -19,29 +34,44 @@ router.post('/search', async (req, res) => {
         // 1. Lấy tài liệu internal
         // =========================
 
-        const documents = await Document.find({
+        const allDocuments = await Document.find({
             status: 'approved'
         })
-            .populate('subject_id', 'name')
-            .limit(30);
+            .populate('subject_id', 'name');
+
+        // <=== THÊM BƯỚC LỌC FUSE (lấy TOP 5 tài liệu khớp nhất)
+        const normalizedQuery = removeAccents(query);
+
+        const docsForFuse = allDocuments.map(doc => ({
+            ...doc.toObject(),
+            _searchTitle: removeAccents(doc.title || ''),
+            _searchSubject: removeAccents(doc.subject_id?.name || ''),
+        }));
+
+        const fuse = new Fuse(docsForFuse, {
+            keys: [
+                { name: '_searchTitle', weight: 0.7 },
+                { name: '_searchSubject', weight: 0.3 },
+            ],
+            threshold: 0.4,
+            ignoreLocation: true,
+            minMatchCharLength: 2,
+        });
+
+        const fuseResults = fuse.search(normalizedQuery);
+        const documents = fuseResults.slice(0, 5).map(r => r.item);  // <=== CHỈ LẤY TOP 5
 
         // =========================
-        // 2. Search Google
+        // 2. Search Google (SỬA QUERY)
         // =========================
 
-        const searchQueries = [
-            `${query} giáo trình filetype: pdf`,
-            `${query} bài giảng filetype: pdf`,
-            `${query} site: edu.vn`,
-            `${query} tài liệu học tập`
-        ];
+        const searchQuery = `${query} (giáo trình OR "bài giảng" OR "tài liệu học tập") filetype:pdf`;
 
         let googleResults = [];
 
-        for (const q of searchQueries) {
-            const results = await searchGoogle(q);
-            googleResults.push(...results);
-        }
+        // <=== SỬA: chỉ 1 query thay vì vòng lặp
+        const results = await searchGoogle(searchQuery);
+        googleResults.push(...results);
 
         // Remove duplicate URL
         googleResults = googleResults.filter(
@@ -117,7 +147,7 @@ TRẢ VỀ JSON DUY NHẤT:
         // =========================
 
         const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
             {
                 contents: [
                     {
