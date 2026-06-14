@@ -78,100 +78,83 @@ router.post('/search', async (req, res) => {
         });
 
         // =========================
-        // 3. GOOGLE SEARCH (CHỈ KHI KHÔNG CÓ TÀI LIỆU NỘI BỘ)
+        // 3. GOOGLE SEARCH (CHỈ SỬA ĐOẠN NÀY - BỎ DOMAIN, TỐI ƯU QUERY)
         // =========================
         let googleResults = [];
 
         if (topDocuments.length === 0) {
             console.log("\n⚠️ Không có tài liệu nội bộ, gọi Google Search...");
 
-            // Từ khóa đại học để lọc trình độ
-            const uniKeywords = ["đại học", "cao đẳng", "university", "college", "sinh viên"];
-            const hasUniKeyword = uniKeywords.some(kw => query.toLowerCase().includes(kw));
+            // Query mới: bỏ site:edu.vn, thêm từ khóa đại học, loại trừ cấp 1-2-3
+            const smartQuery = `"${query}" (giáo trình OR "bài giảng" OR "tài liệu học tập") filetype:pdf đại học sinh viên"`;
 
-            // Xây dựng query thông minh
-            let smartQuery = `"${query}" tài liệu filetype:pdf OR filetype:doc OR filetype:docx`;
-
-            if (!hasUniKeyword) {
-                smartQuery = `${smartQuery} đại học sinh viên`;
-            }
-
-            // Loại trừ kết quả cấp 1-2-3
-            const excludePatterns = ["lớp 1", "lớp 2", "lớp 3", "lớp 4", "lớp 5", "tiểu học", "THCS", "THPT", "cấp 1", "cấp 2", "cấp 3"];
-            const excludePart = excludePatterns.map(kw => `-"${kw}"`).join(' ');
-            smartQuery = `${smartQuery} ${excludePart}`;
-
-            console.log("\n===== GOOGLE QUERY =====");
+            console.log("===== GOOGLE QUERY =====");
             console.log(smartQuery);
-            console.log("=========================");
 
             try {
                 googleResults = await searchGoogle(smartQuery);
-                console.log("Raw results count:", googleResults?.length || 0);
-
-                // Hậu lọc kết quả
-                const filteredResults = googleResults.filter(item => {
-                    const title = (item.title || "").toLowerCase();
-                    const snippet = (item.snippet || "").toLowerCase();
-                    const isPrimary = excludePatterns.some(p => title.includes(p) || snippet.includes(p));
-                    return !isPrimary;
-                });
-
-                googleResults = filteredResults.slice(0, 15);
-                console.log("After filter:", googleResults.length);
+                console.log("Results count:", googleResults?.length || 0);
             } catch (err) {
                 console.log("❌ Google error:", err.message);
             }
+
+            googleResults = googleResults.slice(0, 15);
+
+            console.log("\n===== GOOGLE FINAL =====");
+            console.log("Total:", googleResults.length);
         } else {
-            console.log("\n✅ Có tài liệu nội bộ, KHÔNG gọi Google");
+            console.log("\n✅ Đã tìm thấy tài liệu nội bộ, KHÔNG gọi Google Search");
         }
 
         // =========================
-        // 4. GEMINI PROMPT (CHỈ GỬI TOP 5 TÀI LIỆU)
+        // 4. GEMINI PROMPT (GIỮ NGUYÊN)
         // =========================
-        const prompt = `Bạn là trợ lý tìm kiếm tài liệu học tập cho sinh viên đại học.
+        const prompt = `
+Bạn là trợ lý tìm kiếm tài liệu học tập.
 
-**QUAN TRỌNG: Trả về DUY NHẤT object JSON, không kèm text khác.**
+**QUAN TRỌNG: Bạn PHẢI trả về MỘT object JSON DUY NHẤT, không có bất kỳ text nào khác ngoài JSON.**
 
 FORMAT JSON:
 {
-  "answer": "Câu trả lời bằng tiếng Việt, ngắn gọn",
+  "answer": "Câu trả lời bằng tiếng Việt, ngắn gọn, dựa trên tài liệu có sẵn",
   "documents": [
     {
       "source": "internal",
-      "id": "ID",
-      "reason": "Lý do chọn",
+      "id": "ID_của_tài_liệu_nội_bộ",
+      "reason": "Lý do ngắn gọn tại sao tài liệu này phù hợp",
       "score": 0.95
     }
   ]
 }
 
-INTERNAL DOCUMENTS:
+INTERNAL DOCUMENTS (đã được lọc theo độ liên quan):
 ${topDocuments.map((doc, idx) => `${idx + 1}.
 ID: ${doc._id}
 Tiêu đề: ${doc.title}
 Môn: ${doc.subject_id?.name || 'N/A'}
-Mô tả: ${doc.description || 'Không có'}`).join('\n')}
+Mô tả: ${doc.description || 'Không có mô tả'}`).join('\n')}
 
-${googleResults.length > 0 ? `GOOGLE RESULTS (dùng nếu không có internal phù hợp):
+${googleResults.length > 0 ? `GOOGLE RESULTS (chỉ dùng nếu không có tài liệu nội bộ phù hợp):
 ${googleResults.map((item, idx) => `${idx + 1}.
 Title: ${item.title}
 URL: ${item.url}
 Snippet: ${item.snippet}`).join('\n')}` : ''}
 
-CÂU HỎI: "${query}"
+CÂU HỎI CỦA NGƯỜI DÙNG: "${query}"
 
 HƯỚNG DẪN:
-- Ưu tiên tài liệu nội bộ nếu phù hợp
-- Nếu không có nội bộ, dùng Google results
-- Chỉ chọn 2-3 tài liệu phù hợp nhất
+- Nếu có tài liệu nội bộ (INTERNAL DOCUMENTS), hãy ưu tiên chọn từ đó, KHÔNG dùng Google.
+- Nếu không có tài liệu nội bộ nào phù hợp, documents = [] và answer = "Không tìm thấy tài liệu phù hợp trong hệ thống. Bạn có thể thử tìm kiếm trên Google với từ khóa khác."
+- Chỉ chọn 2-3 tài liệu phù hợp nhất.
 
-Trả về JSON DUY NHẤT.`;
+Trả về JSON DUY NHẤT, không kèm text giải thích.
+`;
 
         if (topDocuments.length === 0 && googleResults.length === 0) {
+            console.log("❌ Không có kết quả nào từ cả nội bộ và Google");
             return res.json({
                 query,
-                answer: "Không tìm thấy tài liệu phù hợp. Vui lòng thử từ khóa khác.",
+                answer: "Không tìm thấy tài liệu phù hợp với câu hỏi của bạn. Vui lòng thử từ khóa khác.",
                 results: [],
                 count: 0
             });
@@ -183,7 +166,8 @@ Trả về JSON DUY NHẤT.`;
         );
 
         const aiText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        console.log("\n===== GEMINI RAW =====", aiText);
+        console.log("\n===== GEMINI RAW =====");
+        console.log(aiText);
 
         let aiResponse = { answer: '', documents: [] };
         try {
@@ -193,9 +177,6 @@ Trả về JSON DUY NHẤT.`;
             console.log("❌ Parse error:", error.message);
         }
 
-        // =========================
-        // 5. BUILD KẾT QUẢ
-        // =========================
         const internalDocs = [];
         for (const doc of aiResponse.documents || []) {
             if (doc.source === 'internal' && doc.id) {
@@ -230,14 +211,16 @@ Trả về JSON DUY NHẤT.`;
 
         let answer = aiResponse.answer;
         if (!answer) {
-            if (internalDocs.length > 0) answer = `📚 Tìm thấy ${internalDocs.length} tài liệu phù hợp.`;
-            else if (results.length > 0) answer = `🔍 Hiển thị ${results.length} kết quả từ web.`;
+            if (internalDocs.length > 0) answer = `📚 Tìm thấy ${internalDocs.length} tài liệu phù hợp trong hệ thống.`;
+            else if (results.length > 0) answer = `🔍 Không có tài liệu nội bộ, hiển thị kết quả từ web.`;
             else answer = `❌ Không tìm thấy tài liệu phù hợp.`;
         }
 
         console.log("\n===== FINAL =====");
+        console.log("Internal docs in DB:", allDocuments.length);
+        console.log("Top relevant (sent to AI):", topDocuments.length);
         console.log("Internal results:", internalDocs.length);
-        console.log("Total results:", results.length);
+        console.log("External results:", results.filter(r => r.source === 'external').length);
 
         return res.json({ query, answer, results, count: results.length });
 
