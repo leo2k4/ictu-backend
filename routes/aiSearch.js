@@ -39,49 +39,34 @@ router.post('/search', async (req, res) => {
         console.log("==========================");
 
         // =========================
-        // 2. GOOGLE SEARCH
+        // 2. GOOGLE SEARCH (CHỈ 1 REQUEST)
         // =========================
-        const searchQueries = [
-            `${query} giáo trình filetype: pdf`,
-            `${query} bài giảng filetype: pdf`,
-            `${query} site: edu.vn`,
-            `${query} tài liệu học tập`
-        ];
+        // Gộp tất cả các điều kiện vào 1 câu query duy nhất
+        const smartQuery = `${query} (giáo trình OR "bài giảng" OR "tài liệu học tập") filetype:pdf site:edu.vn`;
+
+        console.log("\n===== GOOGLE QUERY =====");
+        console.log(smartQuery);
 
         let googleResults = [];
 
-        for (const q of searchQueries) {
-            console.log("\n===== GOOGLE QUERY =====");
-            console.log(q);
-
-            let results = [];
-
-            try {
-                results = await searchGoogle(q);
-            } catch (err) {
-                console.log("❌ Google error:", err.message);
+        try {
+            googleResults = await searchGoogle(smartQuery);
+            console.log("Results count:", googleResults?.length || 0);
+            if (googleResults?.length > 0) {
+                console.log("Sample:", googleResults[0]);
             }
-
-            console.log("Results count:", results?.length || 0);
-
-            if (results?.length > 0) {
-                console.log("Sample:", results[0]);
-            }
-
-            googleResults.push(...(results || []));
+        } catch (err) {
+            console.log("❌ Google error:", err.message);
         }
 
-        // Remove duplicates
-        googleResults = googleResults.filter(
-            (item, index, self) =>
-                index === self.findIndex(x => x.url === item.url)
-        );
-
+        // Giới hạn kết quả
         googleResults = googleResults.slice(0, 15);
 
         console.log("\n===== GOOGLE FINAL =====");
         console.log("Total:", googleResults.length);
-        console.log(googleResults.slice(0, 3));
+        if (googleResults.length > 0) {
+            console.log("First 3 results:", googleResults.slice(0, 3));
+        }
         console.log("========================");
 
         // =========================
