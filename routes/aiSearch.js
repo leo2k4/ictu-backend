@@ -39,18 +39,18 @@ router.post('/search', async (req, res) => {
         console.log("==========================");
 
         // =========================
-        // 2. GOOGLE SEARCH (CHỈ 1 REQUEST)
+        // 2. GOOGLE SEARCH (CHỈ SỬA ĐOẠN NÀY)
         // =========================
-        // Gộp tất cả các điều kiện vào 1 câu query duy nhất
-        const smartQuery = `${query} (giáo trình OR "bài giảng" OR "tài liệu học tập") filetype:pdf site:edu.vn`;
+        // Thay vì chạy 4 query, gộp thành 1 query duy nhất
+        const searchQuery = `${query} (giáo trình OR "bài giảng" OR "tài liệu học tập") filetype:pdf site:edu.vn`;
 
         console.log("\n===== GOOGLE QUERY =====");
-        console.log(smartQuery);
+        console.log(searchQuery);
 
         let googleResults = [];
 
         try {
-            googleResults = await searchGoogle(smartQuery);
+            googleResults = await searchGoogle(searchQuery);
             console.log("Results count:", googleResults?.length || 0);
             if (googleResults?.length > 0) {
                 console.log("Sample:", googleResults[0]);
@@ -59,18 +59,21 @@ router.post('/search', async (req, res) => {
             console.log("❌ Google error:", err.message);
         }
 
-        // Giới hạn kết quả
+        // Remove duplicates (vẫn giữ nguyên logic cũ)
+        googleResults = googleResults.filter(
+            (item, index, self) =>
+                index === self.findIndex(x => x.url === item.url)
+        );
+
         googleResults = googleResults.slice(0, 15);
 
         console.log("\n===== GOOGLE FINAL =====");
         console.log("Total:", googleResults.length);
-        if (googleResults.length > 0) {
-            console.log("First 3 results:", googleResults.slice(0, 3));
-        }
+        console.log(googleResults.slice(0, 3));
         console.log("========================");
 
         // =========================
-        // 3. GEMINI PROMPT
+        // 3. GEMINI PROMPT (GIỮ NGUYÊN)
         // =========================
         const prompt = `
 Bạn là trợ lý tìm kiếm tài liệu học tập.
@@ -109,7 +112,7 @@ CÂU HỎI: "${query}"
         console.log("======================");
 
         // =========================
-        // 4. PARSE AI
+        // 4. PARSE AI (GIỮ NGUYÊN)
         // =========================
         let aiResponse = {
             answer: '',
@@ -131,7 +134,7 @@ CÂU HỎI: "${query}"
         console.log("=====================");
 
         // =========================
-        // 5. BUILD RESULTS
+        // 5. BUILD RESULTS (GIỮ NGUYÊN)
         // =========================
         const internalDocs = [];
         const externalDocs = [];
@@ -168,7 +171,7 @@ CÂU HỎI: "${query}"
         }
 
         // =========================
-        // 6. FALLBACK
+        // 6. FALLBACK (GIỮ NGUYÊN)
         // =========================
         let results =
             internalDocs.length > 0
@@ -190,7 +193,7 @@ CÂU HỎI: "${query}"
         }
 
         // =========================
-        // 7. ANSWER
+        // 7. ANSWER (GIỮ NGUYÊN)
         // =========================
         let answer = aiResponse.answer;
 
